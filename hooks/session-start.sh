@@ -34,7 +34,7 @@ for f in "$projdir"/*.jsonl; do
 done
 if [ -n "$last" ] && [ ! -e "$(iroha_saved_dir)/$(basename "$last" .jsonl)" ]; then
   ctx="${ctx}
-(前回のセッションは iroha に未保存です。必要なら /iroha-for-notion:save-session で保存できます。)"
+(前回のセッションは iroha に未保存です。必要なら /iroha:save-session で保存できます。)"
 fi
 
 [ -z "$ctx" ] && exit 0
