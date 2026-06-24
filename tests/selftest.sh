@@ -74,8 +74,8 @@ has cc-claude-label "**Claude**" "$cc"
 hasnt cc-no-notification "NOISE-TASKNOTIF" "$cc"
 
 echo "=== config helper (roundtrip, isolated dir) ==="
-CLAUDE_PLUGIN_DATA="$(mktemp -d "${TMPDIR:-/tmp}/iroha-cfg.XXXXXX")"
-export CLAUDE_PLUGIN_DATA
+IROHA_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/iroha-cfg.XXXXXX")"
+export IROHA_CONFIG_DIR
 # shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
 . "$HERE/../scripts/_lib/config.sh"
 iroha_config_set session_db_id "DB123"
@@ -84,7 +84,7 @@ eq config-missing-empty "" "$(iroha_config_get nonexistent_key)"
 iroha_config_set_state_page "/repo/foo" "PAGE9"
 eq config-state-roundtrip "PAGE9" "$(iroha_config_get_state_page "/repo/foo")"
 eq config-state-missing "" "$(iroha_config_get_state_page "/repo/bar")"
-rm -rf "$CLAUDE_PLUGIN_DATA"
+rm -rf "$IROHA_CONFIG_DIR"
 
 echo "=== session-start hook (state injection + save reminder) ==="
 HOOKHOME=$(mktemp -d "${TMPDIR:-/tmp}/iroha-home.XXXXXX")
@@ -96,7 +96,7 @@ mkdir -p "$HOOKHOME/.claude/projects/$HASH" "$HOOKDATA/state"
 printf 'STATE-CONTENT-XYZ' >"$HOOKDATA/state/${HASH}.md"
 run_hook() {
   printf '{"cwd":"%s","session_id":"cur"}' "$PROJ" |
-    CLAUDE_PLUGIN_ROOT="$HERE/.." CLAUDE_PLUGIN_DATA="$HOOKDATA" HOME="$HOOKHOME" \
+    CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$HOOKDATA" HOME="$HOOKHOME" \
       bash "$HERE/../hooks/session-start.sh"
 }
 out=$(run_hook)

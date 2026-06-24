@@ -9,7 +9,9 @@
 set -u
 
 iroha_config_path() {
-  local base="${CLAUDE_PLUGIN_DATA:-${IROHA_CONFIG_DIR:-$HOME/.iroha-for-notion}}"
+  # Stable per-user location: same path whether invoked from a skill, a hook, or the
+  # CLI, and it survives plugin reinstalls. Override with IROHA_CONFIG_DIR for tests.
+  local base="${IROHA_CONFIG_DIR:-$HOME/.iroha-for-notion}"
   printf '%s/config.json' "$base"
 }
 
