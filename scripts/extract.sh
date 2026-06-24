@@ -55,6 +55,13 @@ case "$cmd" in
       END { flush() }
     '
     ;;
+  chat-toggle)
+    # chat-callouts wrapped in a collapsed toggle (folded by default; expand to read).
+    # Optional 3rd arg = the <summary> label (default English "Conversation").
+    printf '<details>\n<summary>%s</summary>\n' "${3:-Conversation}"
+    bash "$0" chat-callouts "$file" | sed 's/^/\t/'
+    printf '</details>\n'
+    ;;
   files)
     jq -rs '
       [ .[] | select(.isSidechain != true) | select(.type == "assistant")

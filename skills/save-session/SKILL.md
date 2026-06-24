@@ -63,16 +63,22 @@ Property map uses SQLite values:
 - `Type` — a JSON array **string**, e.g. `"[\"設計\", \"実装\"]"`.
 - Date — expanded keys: `"date:Date:start"` = started ISO, `"date:Date:is_datetime"` = 1.
 
-**`content` = Notion-flavored Markdown, visual and monochrome (no emoji icons).** Read
-the spec once via the MCP resource `notion://docs/enhanced-markdown-spec`. Use:
+**`content` = Notion-flavored Markdown, visual and monochrome (no emoji icons).**
+Render **all headings and labels in the user's conversation language, defaulting to
+English** when unsure. Read the spec once via `notion://docs/enhanced-markdown-spec`.
+Use this structure (English canonical names shown — translate them to the user's
+language):
 - a header `<callout color="blue_bg">` with the one-line summary;
 - a meta `<table header-column="true">` (Project / Status / Type / Date / Branch · Author);
-- `## アーキテクチャ` with a ```mermaid``` diagram when the work has structure;
-- `## 決定事項` as a `<table header-row="true">` with a `<tr color="blue_bg">` header
-  (columns: 決定 / なぜ / 却下した代替案);
-- `## 開発ルール` as a `<callout color="gray_bg">`;
-- `## 進捗` as a green_bg callout (Done) + an orange_bg callout (Unfinished, `- [ ]`);
-- `## 詳細` with `<details><summary>…</summary>` toggles for files and commands.
+- `## Architecture` with a ```mermaid``` diagram when the work has structure;
+- `## Decisions` as a `<table header-row="true">` with a `<tr color="blue_bg">` header
+  (columns: Decision / Why / Rejected alternatives);
+- `## Rules` as a `<callout color="gray_bg">`;
+- `## Progress` as a green_bg callout (Done) + an orange_bg callout (Unfinished, `- [ ]`);
+- `## Details` with `<details><summary>…</summary>` toggles for **Changed files** and
+  **Commands** — render these as **bulleted lists**: the `extract.sh files` and
+  `commands` outputs are already `- ` lists, so use them verbatim (never join entries
+  with `·` or other separators).
 Wrap file names / commands in backticks so Notion does not auto-linkify them. Indent
 callout / toggle / table children with **tabs**. Keep the returned page URL.
 
@@ -85,22 +91,35 @@ For each decision, `notion-create-pages` under `decisions_ds_id`: `Name` = the
 decision, `Project`, `Status` = `Active`, `Tags` (JSON array string), `Rationale`,
 `Alternatives`, `Session` = the Session page URL from step 5, `"date:Date:start"`.
 
-## 7. Append the full chat log (visual, in batches)
-
-The chat is the whole point — never summarize it here. Render it as alternating
-Notion callouts (You = blue_bg, Claude = gray_bg) deterministically:
+Also append each decision to the **local decision log** so `/iroha-for-notion:recall`
+can search it for free (offline; the Notion MCP query tools need a paid plan):
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/extract.sh" chat-callouts "$TX" > "$TMP/chat.md"
+DEC="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh" decisions-md-path "$PWD")"
+mkdir -p "$(dirname "$DEC")"
+printf '## %s\n- Date: %s\n- Why: %s\n- Rejected: %s\n- Session: %s\n\n' \
+  "<decision>" "<date>" "<rationale>" "<alternatives>" "<session-url>" >>"$DEC"
+```
+
+## 7. Append the full chat log — collapsed by default
+
+The chat is the whole point — never summarize it. It must be **folded by default**
+(a toggle) and contain the full conversation as alternating You/Claude callouts.
+Render it deterministically:
+
+```bash
+# pass the user's-language word for "Conversation" as the 3rd arg (default English)
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/extract.sh" chat-toggle "$TX" "Conversation" > "$TMP/chat.md"
 wc -c "$TMP/chat.md"
 ```
 
-First append a `## 会話ログ` heading to the Session page (`notion-update-page`,
-`insert_content`, `position {"type":"end"}`). Then append the chat **in batches** at
-whole-callout boundaries (one MCP call cannot hold a large chat): repeatedly read the
-next chunk of `chat.md` (e.g. a few dozen callouts) and `insert_content` it with
-`position {"type":"end"}` until the file is consumed. If the chat is very large, tell
-the user how many batches you appended.
+`chat-toggle` wraps the whole chat in one collapsed `<details>` toggle.
+Append it with `notion-update-page` `insert_content`, `position {"type":"end"}`.
+If `chat.md` is too large for one MCP call, append it as **several collapsed
+toggles** instead: split the `chat-callouts` output at whole-callout boundaries,
+wrap each chunk in its own `<details><summary>会話ログ (続き)</summary>…</details>`
+(indent each chunk's lines one tab), and append them in order. Tell the user how
+many parts you appended. Never leave the chat un-collapsed.
 
 ## 8. Update the Project State page (continuity core)
 

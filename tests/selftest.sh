@@ -72,6 +72,11 @@ has cc-callout-open "<callout color=\"blue_bg\">" "$cc"
 has cc-you-label "**You**" "$cc"
 has cc-claude-label "**Claude**" "$cc"
 hasnt cc-no-notification "NOISE-TASKNOTIF" "$cc"
+ct=$(bash "$EXTRACT" chat-toggle "$FIX")
+has ct-details "<details>" "$ct"
+has ct-summary-default "<summary>Conversation</summary>" "$ct"
+has ct-callout-inside "<callout color=" "$ct"
+has ct-label-override "<summary>会話ログ</summary>" "$(bash "$EXTRACT" chat-toggle "$FIX" "会話ログ")"
 
 echo "=== config helper (roundtrip, isolated dir) ==="
 IROHA_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/iroha-cfg.XXXXXX")"
@@ -108,6 +113,18 @@ hasnt hook-no-remind-when-saved "未保存" "$(run_hook)"
 rm -f "$HOOKDATA/state/${HASH}.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl"
 eq hook-silent-when-empty "" "$(run_hook)"
 rm -rf "$HOOKHOME" "$HOOKDATA"
+
+echo "=== recall (local, offline decision search) ==="
+RECDIR=$(mktemp -d "${TMPDIR:-/tmp}/iroha-rec.XXXXXX")
+DEC="$RECDIR/decisions/-tmp-recproj.md"
+mkdir -p "$(dirname "$DEC")"
+printf '## Prisma を採用\n- Why: 型安全\n- Rejected: Drizzle\n\n## relation は使わない\n- Why: MCP バグ\n- Rejected: native relation\n' >"$DEC"
+recall_out=$(IROHA_CONFIG_DIR="$RECDIR" CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "/tmp/recproj" "drizzle")
+has recall-hit "Prisma を採用" "$recall_out"
+hasnt recall-miss "relation は使わない" "$recall_out"
+miss_out=$(IROHA_CONFIG_DIR="$RECDIR" CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "/tmp/recproj" "kubernetes")
+hasnt recall-empty "Prisma" "$miss_out"
+rm -rf "$RECDIR"
 
 echo "=== result: $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ]

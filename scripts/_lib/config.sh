@@ -68,10 +68,19 @@ iroha_state_md_path() {
 # iroha_saved_dir  -> directory of per-session "saved" markers.
 iroha_saved_dir() { printf '%s/saved' "$(dirname "$(iroha_config_path)")"; }
 
+# iroha_decisions_md_path <cwd>  -> local append-log of decisions (free, offline recall).
+iroha_decisions_md_path() {
+  local base key
+  base="$(dirname "$(iroha_config_path)")"
+  key="$(printf '%s' "$1" | sed 's#/#-#g')"
+  printf '%s/decisions/%s.md' "$base" "$key"
+}
+
 # CLI: usable from skills as `bash config.sh <cmd> ...`. Guarded so sourcing is a no-op.
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
   case "${1:-}" in
     state-md-path) iroha_state_md_path "${2:-}" ;;
+    decisions-md-path) iroha_decisions_md_path "${2:-}" ;;
     saved-dir) iroha_saved_dir ;;
     get) iroha_config_get "${2:-}" ;;
     set) iroha_config_set "${2:-}" "${3:-}" ;;
