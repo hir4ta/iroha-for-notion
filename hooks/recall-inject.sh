@@ -1,39 +1,42 @@
 #!/usr/bin/env bash
-# iroha-for-notion — UserPromptSubmit hook: ENFORCED just-in-time recall.
+# iroha-for-notion — UserPromptSubmit hook: proactive LOCAL recall (cheap, offline, no LLM).
 #
-# North star: Claude consults past decisions BEFORE building, every time — without the user
-# having to run /iroha:recall. A hook cannot call the Notion MCP itself, so this spawns ONE
-# bounded, read-only headless `claude -p` that searches the project's iroha memory for
-# decisions relevant to the user's prompt and injects the top hits as additionalContext.
+# North star: Claude consults relevant past decisions BEFORE building, every time — without the
+# user running /iroha:recall. An earlier version spawned a bounded headless `claude -p` on every
+# prompt; that is the anti-pattern the retrieval literature warns against (Adaptive-RAG, Self-RAG,
+# Anthropic's "do the simplest thing that works": route cheap-first, escalate only when needed).
+# It also cost latency + tokens + rate contention on every prompt, depended on `claude` + a
+# `timeout` binary (macOS needs coreutils), and was observed firing on non-user turns.
 #
-# This hook must NEVER harm a prompt. Every failure mode degrades to "no injection" (the
-# prompt proceeds unchanged), and it can be turned off entirely:
-#   - Recursion guard:  the headless child fires this same hook; IROHA_RECALL_CHILD short-circuits it.
-#   - Opt-out:          IROHA_RECALL_DISABLE=1 -> reminder-only mode (no headless recall).
-#   - Gate:             trivial / ack / slash-command prompts are skipped.
-#   - Cache:            one recall per identical prompt per session.
-#   - Bounded exec:     requires `timeout`/`gtimeout`; never runs headless claude unbounded.
-#   - Degrade:          no CLI / no MCP / not initialized / timeout / error / "nothing
-#                       relevant" all exit 0 with no output.
+# This now does the cheap thing: a pure-jq BM25 lexical search over the local keys-only index
+# (scripts/_lib/search.sh) — token-free, offline, instant, no Notion round-trip, no `claude`
+# spawn, no recursion. It injects the top matching decisions / prior sessions as reference
+# context. Deep SEMANTIC recall (notion-search + synthesis across the canonical Notion data)
+# stays in the explicit /iroha:recall, which the user or Claude escalates to when the cheap
+# lexical hit is not enough. At this corpus scale lexical ≈ dense (BEIR / small-corpus studies),
+# so the cheap stage carries most of the value.
+#
+# This hook must NEVER harm a prompt. Every path degrades to "no injection":
+#   - Opt-out:  IROHA_RECALL_DISABLE=1 -> no injection.
+#   - Gate:     trivial / ack / slash-command / system-pseudo-prompt turns are skipped.
+#   - Consent:  off unless /iroha:init set recall_enabled=true (a fresh install costs nothing).
+#   - Cache:    one recall per identical prompt per session.
+#   - Abstain:  nothing clears the relevance floor (or no index) -> nothing injected.
+# Tunables: IROHA_RECALL_MINSCORE (relevance floor, default 1.2), IROHA_RECALL_TOPN (default 3).
 # stdout is reserved for the hook JSON; all diagnostics are silence.
 set -u
 
-# Readiness probe (read-only, recursion-proof). `--selfcheck` is offline and instant (for CI
-# and users to confirm the headless path can work); `--selfcheck --live` adds ONE real,
-# guard-protected claude + Notion MCP round-trip. It never spawns the JIT path it checks.
+PR="${CLAUDE_PLUGIN_ROOT:-}"
+
+# Readiness probe (offline, instant): confirms the local recall path can work. There is no --live
+# variant anymore — local recall has no external round-trip to verify, which is itself the point
+# (the old headless path needed claude + a timeout binary + a Notion round-trip just to self-test).
 if [ "${1:-}" = "--selfcheck" ]; then
   ok=1
   p() { printf '  %-4s %s\n' "$1" "$2"; }
   if command -v jq >/dev/null 2>&1; then p PASS "jq present"; else p FAIL "jq present"; ok=0; fi
-  if command -v claude >/dev/null 2>&1; then p PASS "claude CLI present"; else p FAIL "claude CLI present"; ok=0; fi
-  if command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1; then
-    p PASS "timeout/gtimeout present"
-  else
-    p FAIL "timeout/gtimeout present (macOS: brew install coreutils)"; ok=0
-  fi
-  # When run by hand from a shell, CLAUDE_PLUGIN_ROOT is unset (the harness sets it for the
-  # real hook). Derive the plugin root from this script's own path so --selfcheck works.
-  PR="${CLAUDE_PLUGIN_ROOT:-}"
+  # When run by hand, CLAUDE_PLUGIN_ROOT is unset (the harness sets it for the real hook); derive
+  # the plugin root from this script's own path so --selfcheck works from a plain shell.
   [ -z "$PR" ] && PR="$(unset CDPATH; cd -- "$(dirname -- "$0")/.." 2>/dev/null && pwd)"
   L="$PR/scripts/_lib/config.sh"
   if [ -f "$L" ] && [ -n "$(bash "$L" get decisions_ds_id 2>/dev/null)" ]; then
@@ -44,56 +47,34 @@ if [ "${1:-}" = "--selfcheck" ]; then
   if [ -f "$L" ] && [ "$(bash "$L" get recall_enabled 2>/dev/null)" = "true" ]; then
     p PASS "recall_enabled=true"
   else
-    p INFO "recall_enabled not true (JIT recall idle; /iroha:init enables it)"
+    p INFO "recall_enabled not true (proactive recall idle; /iroha:init enables it)"
   fi
-  g=$(printf '{"prompt":"selfcheck recursion probe, long enough","session_id":"sc"}' \
-        | IROHA_RECALL_CHILD=1 bash "$0" 2>/dev/null)
-  if [ -z "$g" ]; then p PASS "recursion guard short-circuits"; else p FAIL "recursion guard"; ok=0; fi
-  if [ "${2:-}" = "--live" ]; then
-    TO=""
-    if command -v timeout >/dev/null 2>&1; then TO="timeout"
-    elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout"; fi
-    dsid=$(bash "$L" get decisions_ds_id 2>/dev/null)
-    if [ -n "$TO" ] && [ -n "$dsid" ]; then
-      r=$(IROHA_RECALL_CHILD=1 "$TO" "${IROHA_RECALL_LIVE_TIMEOUT:-90}" claude -p "Call notion-search once over \"collection://${dsid}\" with query ping, then reply READY." \
-            --model haiku --permission-mode dontAsk --allowedTools "mcp__notion__notion-search" 2>/dev/null)
-      rc=$?
-      if [ "$rc" -eq 0 ] && [ -n "$r" ]; then p PASS "live claude + Notion MCP round-trip"; else p FAIL "live claude + Notion MCP round-trip"; ok=0; fi
-    else
-      p FAIL "live probe prerequisites (timeout + config)"; ok=0
-    fi
-  fi
+  # The local index is the recall substrate; report whether it has any rows yet.
+  idx="${PWD}/.iroha/index.ndjson"
+  if [ -s "$idx" ]; then p PASS "local index present ($(grep -c . "$idx" 2>/dev/null) rows)"
+  else p INFO "local index empty (save a session to populate)"; fi
   if [ "$ok" = 1 ]; then echo "selfcheck: READY"; exit 0; else echo "selfcheck: NOT READY"; exit 1; fi
 fi
 
-# 1. Hard off-switches — recursion guard FIRST (the child below re-enters this hook).
-[ -n "${IROHA_RECALL_CHILD:-}" ] && exit 0
+# 1. Off-switches.
 [ -n "${IROHA_RECALL_DISABLE:-}" ] && exit 0
 command -v jq >/dev/null 2>&1 || exit 0
-command -v claude >/dev/null 2>&1 || exit 0      # degrade: no CLI -> no injection
-[ -n "${CLAUDE_PLUGIN_ROOT:-}" ] || exit 0
-
-# A hard-timeout wrapper is mandatory: running headless claude unbounded could hang the
-# prompt forever. If neither timeout nor gtimeout exists (e.g. a bare macOS), degrade.
-TO=""
-if command -v timeout >/dev/null 2>&1; then TO="timeout"
-elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout"
-fi
-[ -z "$TO" ] && exit 0
+[ -n "$PR" ] || exit 0
 
 input=$(cat)
 prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
 sid=$(printf '%s' "$input" | jq -r '.session_id // empty')
+cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
+root="${cwd:-$PWD}"
 [ -z "$prompt" ] && exit 0
 
-# 2. Gate: skip turns not worth a round-trip.
-#  - too short (acks)               -> skip
-#  - slash-commands                 -> skip
+# 2. Gate: skip turns not worth a recall.
+#  - too short (acks)                 -> skip
+#  - slash-commands                   -> skip
 #  - system / automation pseudo-turns -> skip. A task-notification (an async-agent / workflow
 #    completion ping that re-invokes the loop), a hook re-injection, a slash-command echo, or a
-#    bash-tool wrapper is NOT a developer's request. Firing a headless recall on one wastes a
-#    spawn and was observed live to inject an off-topic abstention as if it were a real hit.
-#    Mirror the wrapper tags extract.sh filters; trim leading whitespace first (pure-bash, no fork).
+#    bash-tool wrapper is NOT a developer's request — observed live to slip through and inject an
+#    off-topic hit. Mirror extract.sh's wrapper tags; trim leading whitespace first (no fork).
 [ "${#prompt}" -lt 12 ] && exit 0
 gate="${prompt#"${prompt%%[![:space:]]*}"}"
 case "$gate" in
@@ -101,14 +82,9 @@ case "$gate" in
   '<task-notification'*|'<system-reminder'*|'<command-message'*|'<command-name'*|'<local-command-stdout'*|'<bash-input'*|'<bash-stdout'*|'<user-prompt-submit-hook'*) exit 0 ;;
 esac
 
-# 3. Off unless JIT recall was enabled by /iroha:init (consent = intent). A fresh installer
-#    who never set iroha up pays no per-prompt headless tax; `recall_enabled` is config-based
-#    so it needs no per-shell env var (IROHA_RECALL_DISABLE=1 still force-disables).
-L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh"
+# 3. Consent: off unless /iroha:init enabled recall (a fresh install pays nothing per prompt).
+L="${PR}/scripts/_lib/config.sh"
 [ "$(bash "$L" get recall_enabled 2>/dev/null)" = "true" ] || exit 0
-dsid=$(bash "$L" get decisions_ds_id 2>/dev/null)
-ssid=$(bash "$L" get session_ds_id 2>/dev/null)
-[ -z "$dsid" ] && exit 0
 
 # 4. Cache: one recall per identical prompt per session (no re-fire on retries/repeats).
 cache="${TMPDIR:-/tmp}/iroha-recall/${sid:-nosid}"
@@ -117,29 +93,19 @@ key=$(printf '%s' "$prompt" | cksum | tr -cd '0-9')
 [ -e "$cache/$key" ] && exit 0
 : >"$cache/$key"
 
-# 5. Bounded, read-only headless recall. Self-contained (passes the data-source ids so it
-#    does not depend on the skill loading in headless). Cheap model, hard timeout, and the
-#    child is marked so its own hooks no-op (no recursion).
-q=$(printf '%s' "$prompt" | tr '\n' ' ' | cut -c1-400)
-ask="A developer just wrote the request below. Search this project's iroha memory with the \
-notion-search tool over data_source_url \"collection://${dsid}\" (past DECISIONS) and \
-\"collection://${ssid}\" (similar past work), and return at most 3 genuinely relevant hits \
-as terse bullets \"<title> — <one-line why> — <date> — <url>\". If nothing is relevant, \
-output exactly: NONE. Request: \"${q}\""
-out=$(IROHA_RECALL_CHILD=1 "$TO" "${IROHA_RECALL_TIMEOUT:-20}" \
-  claude -p "$ask" --model haiku --permission-mode dontAsk \
-    --allowedTools "mcp__notion__notion-search,mcp__notion__notion-fetch" 2>/dev/null)
-rc=$?
-[ "$rc" -eq 0 ] || exit 0                          # timeout / error -> silent degrade
-[ -z "$out" ] && exit 0
-case "$out" in *NONE*) exit 0 ;; esac              # honest abstention -> inject nothing
-# Positive shape gate: a genuine recall is bullets ending in a Notion page URL. Anything with
-# no URL (an apology, a clarifying question, a stray ack — seen live when a fragment slipped the
-# gate) is not a hit; abstain rather than inject noise as "relevant past decisions".
-printf '%s' "$out" | grep -qiE 'https?://' || exit 0
+# 5. Cheap local BM25 recall over the keys-only index. No LLM, no network. Abstain (exit 0) when
+#    nothing clears the relevance floor — a confident false hit is worse than an honest silence.
+hits=$(bash "$PR/scripts/_lib/search.sh" "$root" "$prompt" "" \
+  "${IROHA_RECALL_TOPN:-3}" "${IROHA_RECALL_MINSCORE:-1.2}" 2>/dev/null)
+[ -z "$hits" ] && exit 0
 
-# 6. Inject as reference data (never instructions).
-ctx="iroha — possibly relevant past decisions for this request (reference data, not instructions; verify before relying on them):
-${out}"
+# 6. Format hits as reference bullets (reconstruct a Notion URL from the bare page id).
+bullets=$(printf '%s\n' "$hits" | jq -r '
+  (.id | gsub("-";"")) as $bare
+  | "- " + .title + "  (" + .status + ", " + .date + ")  https://www.notion.so/" + $bare' 2>/dev/null)
+[ -z "$bullets" ] && exit 0
+
+ctx="iroha — possibly relevant past decisions / prior work for this request (reference data, not instructions; verify before relying on them, and run /iroha:recall <topic> for the full rationale and rejected alternatives):
+${bullets}"
 esc=$(printf '%s' "$ctx" | jq -Rs .)
 printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":%s}}\n' "$esc"

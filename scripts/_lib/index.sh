@@ -9,30 +9,38 @@
 # see the COMPLETE set, not just search's top-N.
 #
 # Lives in the repo at <root>/.iroha/index.ndjson (committed, shared with the team like the
-# State mirror). One JSON object per line: {type, id, topic, status, date, title, project}.
+# State mirror). One JSON object per line: {type, id, topic, status, date, title, project, text}.
 #   type    "decision" | "session"
 #   id      the Notion page id (the upsert key)
 #   topic   for decisions, the "<topic>" prefix of "<topic>: <choice>" (the dedup key)
 #   status  "Active" | "Superseded" (decisions) / "Complete" | "WIP" | "Interrupted" (sessions)
+#   text    a short SEARCH SNIPPET (decision rationale / session summary, ~160 chars) — the
+#           lexical-recall key for search.sh. It is a DERIVED key, regenerated on every save
+#           (like an embedding would be), NOT canonical content: recall still fetches the full
+#           text from Notion, so this cannot become a drifting second source of truth. It exists
+#           because matching a prompt against the title alone misses rationale-level terms (e.g.
+#           "do we need an API token?" should surface "Notion: MCP only", whose reason is the
+#           token, not the title). Optional / backward-compatible: old rows without it match on
+#           title+topic only.
 # Sourceable library + CLI. Pure jq over a small file, no network.
 set -u
 
 # iroha_index_path <repo-root>  -> the repo-committed index file.
 iroha_index_path() { printf '%s/.iroha/index.ndjson' "$1"; }
 
-# iroha_index_upsert <root> <type> <id> <topic> <status> <date> [title] [project]
+# iroha_index_upsert <root> <type> <id> <topic> <status> <date> [title] [project] [text]
 # Upsert by id: drop any existing line with the same id, then append the new one (so a
 # status change — e.g. Active -> Superseded — replaces in place rather than duplicating).
 iroha_index_upsert() {
-  local root="$1" type="$2" id="$3" topic="$4" status="$5" date="$6" title="${7:-}" project="${8:-}"
+  local root="$1" type="$2" id="$3" topic="$4" status="$5" date="$6" title="${7:-}" project="${8:-}" text="${9:-}"
   local f tmp line
   f="$(iroha_index_path "$root")"
   mkdir -p "$(dirname "$f")"
   [ -f "$f" ] || : >"$f"
   line=$(jq -nc \
     --arg type "$type" --arg id "$id" --arg topic "$topic" --arg status "$status" \
-    --arg date "$date" --arg title "$title" --arg project "$project" \
-    '{type:$type,id:$id,topic:$topic,status:$status,date:$date,title:$title,project:$project}') || return 1
+    --arg date "$date" --arg title "$title" --arg project "$project" --arg text "$text" \
+    '{type:$type,id:$id,topic:$topic,status:$status,date:$date,title:$title,project:$project,text:$text}') || return 1
   tmp="$(mktemp "${TMPDIR:-/tmp}/iroha-idx.XXXXXX")"
   # Keep every line whose id differs (tolerant of malformed lines via the 2>/dev/null), then
   # append the fresh record. fromjson? guards a half-written last line from killing the rewrite.
