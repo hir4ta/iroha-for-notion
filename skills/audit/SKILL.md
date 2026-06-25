@@ -34,8 +34,10 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
 
 - **A. Duplicate Active decisions** — two `Status = Active` rows sharing the same `<topic>`
   are a conflict (one should be `Superseded`). Now **exhaustive** via the index — every
-  conflicted topic, not just what search surfaced:
-  `bash "$IDX" list "$PWD" decision | jq -r 'select(.status=="Active")|.topic' | sort | uniq -d`
+  conflicted topic, not just what search surfaced. Use **pure jq** (not `sort | uniq -d`,
+  which mis-groups multibyte/Japanese topics under some locales — a real false-positive
+  found while dogfooding):
+  `bash "$IDX" list "$PWD" decision | jq -s 'map(select(.status=="Active"))|group_by(.topic)|map(select(length>1))|map(.[0].topic)|.[]'`
   (severity: high — the defect that most rots recall.)
 - **B. Should-be-superseded** — an `Active` decision whose `Rationale` is contradicted by
   a newer `Active` decision on the same topic, or which a later Session's decisions

@@ -1,0 +1,20 @@
+{"type":"decision","id":"38a822c6-938a-81ce-aa04-cfcec8a09884","topic":"リコール","status":"Superseded","date":"2026-06-25","title":"リコール: notion-search 主体","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-81f3-b5d3-c177c2ece5d1","topic":"会話ログ","status":"Superseded","date":"2026-06-25","title":"会話ログ: 全文を折りたたみ保存","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-81ac-8441-c6a48e76f7e0","topic":"リコール","status":"Superseded","date":"2026-06-24","title":"リコール: ローカル grep","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-811b-80ba-e4612f80b3d3","topic":"会話ログ","status":"Superseded","date":"2026-06-24","title":"会話ログ: 全文でなくハイライト","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-8119-bce1-d4bc6eb133cf","topic":"変更ファイル","status":"Superseded","date":"2026-06-24","title":"変更ファイル: 箇条書き表示","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-8137-824d-e4883efdbcf5","topic":"Notion 連携","status":"Active","date":"2026-06-24","title":"Notion 連携: MCP 一本","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-8159-8bca-c1edc602bb62","topic":"compact復帰","status":"Active","date":"2026-06-25","title":"compact復帰: 会話を再注入","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-811c-9f41-e8dba15ef28f","topic":"抽出は bash / 知性は Claude","status":"Active","date":"2026-06-24","title":"抽出は bash / 知性は Claude","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-81ef-829e-c0f6b1bc2b91","topic":"State","status":"Active","date":"2026-06-24","title":"State: ローカルミラー→hook 注入","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-812a-86fc-f709b3428ec2","topic":"連結","status":"Active","date":"2026-06-24","title":"連結: relation でなく URL","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-8152-8782-d2078520df89","topic":"テンプレ言語","status":"Active","date":"2026-06-24","title":"テンプレ言語: 会話言語・既定英語","project":"iroha-for-notion"}
+{"type":"decision","id":"389822c6-938a-81c2-8282-decbef2afe19","topic":"命名","status":"Active","date":"2026-06-24","title":"命名: iroha に短縮","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-8127-aa5f-faca33f325ca","topic":"Session失効","status":"Active","date":"2026-06-25","title":"Session失効: 読取時ガード","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-81af-a4ab-c38c9f533b07","topic":"リコール","status":"Active","date":"2026-06-25","title":"リコール: hybrid(検索+index)","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-8175-8a6d-ece0145279ad","topic":"会話ログ","status":"Active","date":"2026-06-25","title":"会話ログ: 全文を子ページ保存","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-8167-98c2-fd940cb1dd06","topic":"メモリ列挙","status":"Active","date":"2026-06-25","title":"メモリ列挙: keys-only index","project":"iroha-for-notion"}
+{"type":"decision","id":"38a822c6-938a-81cf-90a9-de7802089555","topic":"JIT recall","status":"Active","date":"2026-06-25","title":"JIT recall: 強制headless","project":"iroha-for-notion"}
+{"type":"session","id":"389822c6-938a-81b8-832a-e4aa55d62121","topic":"","status":"WIP","date":"2026-06-24","title":"2026-06-24 — Notion 連携の設計と Phase 1 実装","project":"iroha-for-notion"}
+{"type":"session","id":"38a822c6-938a-812c-92e2-e40b02e39b13","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — 徹底評価とドッグフーディング再開","project":"iroha-for-notion"}
+{"type":"session","id":"38a822c6-938a-813a-9968-ef7b2375b86b","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — 90点ロードマップ実装と検証","project":"iroha-for-notion"}
