@@ -1,6 +1,6 @@
 ---
 name: project
-description: Capture or update this project's architecture profile in iroha — language(s), frameworks / key libraries, dev tooling, CI, an architecture diagram, and setup steps — so juniors catch up fast and Claude can find how other projects (same language / same library) are built. Run manually when the stack is set up or materially changes. Triggers on "/iroha:project", "update the project profile", "アーキテクチャを保存", "プロジェクトのスタックを記録".
+description: Capture or update this project's architecture profile in iroha — language(s), frameworks / key libraries, dev tooling, CI, an architecture diagram, and setup steps — so juniors catch up fast and Claude can find how other projects (same language / same library) are built. Run manually when the stack is set up or materially changes. Triggers on "/iroha:project", "update the project profile", "save the architecture", "record the project stack".
 argument-hint: ""
 ---
 

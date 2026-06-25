@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "記憶の健全性チェック", "メモリを監査", "audit the memory". Not for saving a session (use /iroha:save-session) or recalling a past decision (use /iroha:recall).
+description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "audit the memory", "check memory health". Not for saving a session (use /iroha:save-session) or recalling a past decision (use /iroha:recall).
 argument-hint: "[--fix]"
 ---
 
@@ -39,7 +39,7 @@ Enumerate via `notion-search` (broad queries over each data source, `page_size` 
     state, e.g. "2 DB" when the newest session is "3 DB"); (medium)
   - its **Recent sessions** links vs the actual newest Sessions (missing/wrong); (medium)
   - **stale unfinished** — any `- [ ]` item carried for **3+ sessions** (look for the
-    `[N回繰越]` marker save-session writes, or infer from dates). (low — but nag-worthy.)
+    `[carried Nx]` marker save-session writes, or infer from dates). (low — but nag-worthy.)
 - **E. Structure drift** — a Session missing a required section (`## Metrics`,
   `## Decisions`, `## Progress`, `## Highlights`, `## Details`) or whose Highlights look
   invented (a "You" line with no matching real prompt is impossible to verify — flag

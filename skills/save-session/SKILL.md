@@ -1,6 +1,6 @@
 ---
 name: save-session
-description: Save the current Claude Code session to Notion as structured, visual, queryable memory — decisions (with rationale and rejected alternatives), dev rules, work-state (done / unfinished), changed files, key commands, and chat-style highlights of the key exchanges. Use at the end of a working session, or when the user says "save this session" / "セッションを保存" / "まとめて保存". Requires a connected Notion MCP and a prior /iroha:init.
+description: Save the current Claude Code session to Notion as structured, visual, queryable memory — decisions (with rationale and rejected alternatives), dev rules, work-state (done / unfinished), changed files, key commands, and chat-style highlights of the key exchanges. Use at the end of a working session, or when the user says "save this session". Requires a connected Notion MCP and a prior /iroha:init.
 argument-hint: "[Complete|WIP|Interrupted]"
 ---
 
@@ -66,9 +66,19 @@ from your memory of the session, but the **You** side is anchored to the determi
 - **Failures** — error -> root cause -> fix.
 - **Highlights** — 5-8 pivotal You<->Claude exchanges, paraphrased, to render
   chat-style (NOT the full transcript).
-- **Type** — any of 調査 / 要件定義 / 設計 / 実装 / 修正 / リファクタ / レビュー
-  (infer from the transcript).
+- **Type** — any of Research / Requirements / Design / Implementation / Fix / Refactor / Review
+  (infer from the transcript). These English names are the **canonical template**; write the
+  value in the user's conversation language to match the options init seeded for this
+  workspace (a Japanese workspace stores the Japanese equivalents).
 - **Status** — `$ARGUMENTS` if given, else infer Complete / WIP / Interrupted.
+
+**Honesty (applies to every field, not only Highlights).** Report what *actually*
+happened — keep dead-ends, corrections, and abandoned approaches at the same weight as the
+wins. Do **not** inflate success in the Summary, Progress, or Decisions; an over-rosy memory
+misleads the next session as surely as a wrong one. Any metric you state (tests passed,
+commits, files) must come from `extract.sh stats` or a real command's output — never
+estimated or rounded up. If you are unsure something happened, leave it out rather than
+assert it.
 
 ## 5. Create the Session row
 
@@ -77,10 +87,12 @@ Property map uses SQLite values:
 - `Name` (title) — **`YYYY-MM-DD — <topic>`** (start date + a ≤20-char noun-phrase
   topic; no project prefix, no Type — those are properties). Calendar / Board cards show
   only the Name, so the date prefix keeps them time-scannable. Good:
-  `2026-06-24 — Notion 連携の設計と Phase 1 実装`. Bad: `iroha: 設計・実装` (no date) /
-  `[設計/実装] …` (Type duplicated).
+  `2026-06-24 — Notion integration design + Phase 1`. Bad: `iroha: design + impl` (no date) /
+  `[Design/Impl] …` (Type duplicated).
 - `Project`, `Status`, `Branch`, `Author`, `Summary` — plain strings.
-- `Type` — a JSON array **string**, e.g. `"[\"設計\", \"実装\"]"`.
+- `Type` — a JSON array **string**, in the user's conversation language to match the seeded
+  options (the English names above are canonical); English-workspace form looks like
+  `"[\"Design\", \"Implementation\"]"`.
 - Date — expanded keys: `"date:Date:start"` = started ISO, `"date:Date:is_datetime"` = `1`
   **as a JSON number, not the string `"1"`** (a string is rejected with a 400).
 
@@ -113,18 +125,39 @@ show Project / Status / Type / Date / Branch / Author at the top:
    `<details><summary>…</summary>` toggle (pitfall -> fix);
 9. `## Details` with `<details><summary>…</summary>` toggles, in this order:
    **Changed files** (`extract.sh files`), **Commands** (`extract.sh commands`),
-   **Tools** (`extract.sh tools` — the per-tool tally), and **Full chat** (`extract.sh
-   chat` — the cleaned, per-turn-capped transcript that backs the curated Highlights;
-   this is the audit trail, collapsed by default). Render the `files` / `commands` /
+   **Tools** (`extract.sh tools` — the per-tool tally). Render the `files` / `commands` /
    `tools` outputs as **bulleted lists** verbatim (they are already `- ` lists; never
-   join entries with `·`). For **Full chat**, render each line as its own paragraph;
-   if `chat` is empty (rare), write "（本文なし）" rather than dropping the toggle.
+   join entries with `·`). The full chat does **not** go inline — it is paged out to a
+   **child page** (step 5b) and the **Full chat** toggle holds only a link to it.
 Wrap every file name / command / path in backticks — **including inside callouts and
 tables** — so Notion does not auto-linkify `.sh` / `.md` names as `http://…` URLs.
 Indent callout / toggle / table children with **tabs**. Keep the returned page URL.
 
 Set a clean monochrome page icon:
 `icon: "https://www.notion.so/icons/notebook_gray.svg"`.
+
+## 5b. Full chat as a child page (never fake it)
+
+The cleaned full chat (`extract.sh chat`) is **paged out** of the Session page to keep it
+scannable, but it must be **real and complete** — never a placeholder. After the Session
+page exists (step 5), create a child page under it: `notion-create-pages` with
+`parent: {"type":"page_id","page_id":"<session_page_id>"}`, title `Full chat`, icon
+`https://www.notion.so/icons/chat_gray.svg`, and `content` = the `extract.sh chat` output
+with **each line as its own paragraph, verbatim**. If the output is large, split it across
+**multiple `notion-create-pages` / append calls** (chunk on line boundaries, never
+mid-line) — the chat is large by nature; do **not** truncate it to fit one call. Then put a
+single link in the Session page's **Full chat** Details toggle:
+`- [Full chat (N turns)](<child_page_url>)`, where N = the line count of
+`extract.sh chat` (`bash "$E" chat "$TX" | wc -l`).
+
+**Anti-fabrication (hard rule).** Never write a sentence that *describes* the chat in place
+of the chat (e.g. "the formatted full chat continues below…"), never claim a turn count you
+did not embed, and never paste a 2-turn excerpt under a "full chat" heading. Either the real
+content is in the child page, or the chat was genuinely empty and the toggle says so with a
+short `(no content)` note (in the user's language). The Full chat is the audit trail that
+proves the curated Highlights were not
+invented — a **fabricated audit trail is worse than none**, and contradicts the project's
+core invariant that Claude never invents conversation.
 
 ## 6. Create the Decision rows
 
@@ -134,8 +167,8 @@ the Session's Decisions table — do **not** promote them, so recall's signal-to
 high. A decision to NOT do something still counts.
 
 For each decision, `notion-create-pages` under `decisions_ds_id`. `Name` = a short
-**`<topic>: <choice>`** title (≤24 chars, no parenthetical) — e.g. `Notion 連携: MCP 一本`,
-`連結: relation でなく URL`. Keep the *why* in `Rationale` and the rejected options in
+**`<topic>: <choice>`** title (≤24 chars, no parenthetical) — e.g. `Notion: MCP only`,
+`Link: URL not relation`. Keep the *why* in `Rationale` and the rejected options in
 `Alternatives`, never in the Name. Also set `Project`, `Status` = `Active`, `Tags` (JSON
 array string from architecture / dependency / process), `Session` = the Session page URL
 from step 5, `"date:Date:start"`.
@@ -186,7 +219,8 @@ DB.
 **Triage the carry-over** every time (this keeps `Unfinished` from rotting into a
 graveyard): for each item carried from the prior State, decide done / still-active /
 stale-drop — keep only what is genuinely still pending, and mark anything carried for
-**2+ sessions** so the team notices stale work. State is fully replaced each save, so
+**2+ sessions** with a `[carried Nx]` tag (translated to the user's language) so the team
+notices stale work. State is fully replaced each save, so
 this triage cannot drift.
 - If get-state is empty: `notion-create-pages` under `container_page_id`
   (title `State — <project>`, icon `https://www.notion.so/icons/target_gray.svg`),

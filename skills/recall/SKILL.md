@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Search this project's iroha memory — past decisions ("did we decide against X? why?") and similar past work ("have we built something like this before?"). Uses Notion semantic search (works on the free plan) over the Sessions and Decisions databases. Triggers on "/iroha:recall", and naturally when the user asks "過去に〜決めた?", "なぜ〜にした?", "似た実装ある?", "did we / why / have we done this before".
+description: Search this project's iroha memory — past decisions ("did we decide against X? why?") and similar past work ("have we built something like this before?"). Uses Notion semantic search (works on the free plan) over the Sessions and Decisions databases. Triggers on "/iroha:recall", and naturally when the user asks "did we decide X?", "why did we choose X?", or "have we built something like this before?".
 argument-hint: "[query]"
 ---
 
@@ -48,6 +48,22 @@ Run `notion-search` once per database, passing the user's query (`$ARGUMENTS`) a
   3). Sessions are immutable history (no supersede), so treat the **newest Session, the
   State page, and `Active` Decisions** as current — never echo a stale Session summary as
   today's fact.
+
+## 4. Abstention — when memory is silent, say so (never fabricate)
+
+If `notion-search` returns no relevant hit, **say so explicitly** — report (in the user's
+conversation language) that no record was found for these search terms, and stop. Do **not**
+invent a past decision, reconstruct one from the current code, or present a plausible-sounding
+answer as if it were recalled. LLMs default to fabricating rather than abstaining (this is an
+unsolved failure mode that does not improve with scale — AbstentionBench), so a confidently
+wrong recall is worse than an honest miss.
+
+**Scope every negative to the search terms, not to existence.** On the free plan
+`notion-search` returns top-N semantic hits, not a complete table scan, so a miss means
+*not found for these terms* — never *no such decision exists*. Before concluding something
+was never decided, retry with different terms and, for a completeness-critical question, run
+`/iroha:audit` (it enumerates the local `.iroha/index.ndjson`, which is exhaustive where
+search is not).
 
 ## Notes
 

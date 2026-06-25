@@ -43,11 +43,21 @@ API token.
    (basename of the user's cwd). Notion auto-creates select options on write, so the
    seeded options are just starting values.
 
+   **Localize to the user's conversation language.** The DDL below is the canonical
+   **English template**. When you actually issue it, translate the human-facing **`Type`**
+   option labels into the user's conversation language (e.g. for a Japanese user, use the
+   Japanese terms for Research / Design / Implementation / etc.). Keep everything
+   **structural in English** so the schema is stable across languages and locales: all
+   property *names*, the `Status` and `Languages` option values, and the `Project` value
+   (the repo name). save-session then writes `Type` in that same language. (This mirrors
+   the working convention: structural keys English, content categories in the user's
+   language.)
+
    Sessions:
 
    ```
    parent: {"type":"page_id","page_id":"<PAGE_ID>"}   title: "Sessions"
-   schema: CREATE TABLE ("Name" TITLE, "Date" DATE, "Project" SELECT('iroha-for-notion':blue), "Branch" RICH_TEXT, "Author" RICH_TEXT, "Summary" RICH_TEXT, "Status" SELECT('Complete':green, 'WIP':yellow, 'Interrupted':red), "Type" MULTI_SELECT('調査':blue, '要件定義':purple, '設計':orange, '実装':green, '修正':red, 'リファクタ':brown, 'レビュー':gray))
+   schema: CREATE TABLE ("Name" TITLE, "Date" DATE, "Project" SELECT('iroha-for-notion':blue), "Branch" RICH_TEXT, "Author" RICH_TEXT, "Summary" RICH_TEXT, "Status" SELECT('Complete':green, 'WIP':yellow, 'Interrupted':red), "Type" MULTI_SELECT('Research':blue, 'Requirements':purple, 'Design':orange, 'Implementation':green, 'Fix':red, 'Refactor':brown, 'Review':gray))
    ```
 
    Decisions:
@@ -103,7 +113,9 @@ API token.
    `insert_content` at `{"type":"start"}` a one-line `<callout color="gray_bg">`: how to
    navigate (progress → State / past decisions → Decisions / each run → Sessions
    `Recent`) and the naming conventions — sessions `YYYY-MM-DD — <topic>`, decisions
-   `<topic>: <choice>`. This hands a teammate the whole map in one glance.
+   `<topic>: <choice>`. This hands a teammate the whole map in one glance. Write the guide
+   text in the user's conversation language (the English here is the canonical template; the
+   prose a teammate reads should be localized).
 
 10. **Confirm** with links to both databases and tell the user they can now run
     `/iroha:save-session`.

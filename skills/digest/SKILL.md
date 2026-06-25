@@ -1,6 +1,6 @@
 ---
 name: digest
-description: Roll up a period of iroha memory (this week / month / an explicit date range) into one digest — the decisions made, the sessions and what they shipped, aggregate metrics, and what is still open — so a team gets a scannable "what happened lately" without opening every session. Produces a visual Digest page in Notion and reports its URL. Triggers on "/iroha:digest", "週次まとめ", "この期間の振り返り", "summarize the last week / month". Not for saving one session (use /iroha:save-session) or looking up a single past decision (use /iroha:recall).
+description: Roll up a period of iroha memory (this week / month / an explicit date range) into one digest — the decisions made, the sessions and what they shipped, aggregate metrics, and what is still open — so a team gets a scannable "what happened lately" without opening every session. Produces a visual Digest page in Notion and reports its URL. Triggers on "/iroha:digest", "summarize the last week / month". Not for saving one session (use /iroha:save-session) or looking up a single past decision (use /iroha:recall).
 argument-hint: "[week|month|YYYY-MM-DD..YYYY-MM-DD]"
 ---
 
@@ -56,7 +56,7 @@ Sections, in this order:
    (`N sessions, M decisions; themes: …`).
 2. `## Metrics` — a `<callout color="gray_bg">` aggregate dashboard: total sessions,
    total decisions, files touched (sum of each session's `Files`), and a **by-Type**
-   tally (`実装 ×3 · 修正 ×2 · 調査 ×1`). Sum from each session's `## Metrics` line —
+   tally (`Implementation ×3 · Fix ×2 · Research ×1`). Sum from each session's `## Metrics` line —
    do not invent numbers.
 3. `## Decisions made` — a `<table header-row="true">` (`<tr color="blue_bg">` header):
    Decision / Why / Date. One row per Active decision in the window. Wrap code in backticks.
