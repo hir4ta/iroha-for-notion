@@ -15,12 +15,14 @@
 - **データモデル**: Session DB + Decisions DB の 2 つ + プロジェクト 1 枚の State ページ。
   ID は config.json にキャッシュ。**決定/ルールの正本は Decisions DB / CLAUDE.md** に一本化し、
   State / Session ページに全文転記しない (重複防止)。
-- **リコールは `notion-search` 主経路** (無料プランで動く。`query-database-view` /
-  `query-data-sources` は有料なので使わない)。`/iroha:recall` は Sessions/Decisions を
-  semantic 検索し、過去の決定・**類似実装**を引く (使うほど育つチーム記憶の中核)。
-- **ミラーは repo の `.iroha/`**。`state.md` / `decisions.md` をコミットし teammate は pull で共有。
-  SessionStart hook は Notion 非到達なので **repo の `.iroha/state.md` を注入**、オフライン recall は
-  `.iroha/decisions.md` を grep (fallback)。config.json / saved マーカーは $HOME (マシン固有)。
+- **リコールは `notion-search` 一本** (無料プランで動く。`query-database-view` /
+  `query-data-sources` は有料なので使わない。オフライン grep ミラーは持たない＝単一の真実)。
+  `/iroha:recall` は Sessions/Decisions を semantic 検索し、過去の決定・**類似実装**を引く
+  (使うほど育つチーム記憶の中核)。supersede は Decision 名の `トピック:` 前方一致で既存 Active を引く。
+- **ミラーは repo の `.iroha/state.md` のみ**（State をコミットし teammate は pull で共有）。
+  SessionStart hook は Notion 非到達なので repo の `state.md` を注入。**決定はローカルにミラーしない**
+  (notion-search が正本を直接引く＝二重の真実を持たずドリフトを断つ)。config.json / saved マーカーは
+  $HOME (マシン固有)。State の未完了は save 毎にトリアージ (完了/陳腐を落とす)。
 - **命名と履歴**: Session = `YYYY-MM-DD — 主題`、Decision = `トピック: 選択` (理由は Rationale、
   却下案は Alternatives 欄)。決定を覆す時は旧行を **Status=Superseded** にし上書きしない (心変わりも
   記憶)。Session ページのセクション構造は固定 (コア固定＋任意2つ: Architecture / Failures のみ任意)。

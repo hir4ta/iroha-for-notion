@@ -64,16 +64,10 @@ iroha_state_md_path() { printf '%s/.iroha/state.md' "$1"; }
 # iroha_saved_dir  -> directory of per-session "saved" markers (per-machine, in $HOME).
 iroha_saved_dir() { printf '%s/saved' "$(dirname "$(iroha_config_path)")"; }
 
-# iroha_decisions_md_path <project-root>  -> the project's decision log, kept IN THE REPO
-# (<root>/.iroha/decisions.md). Committed so the whole team has an offline recall grep
-# fallback (Notion search is the primary recall). Commit this file.
-iroha_decisions_md_path() { printf '%s/.iroha/decisions.md' "$1"; }
-
 # CLI: usable from skills as `bash config.sh <cmd> ...`. Guarded so sourcing is a no-op.
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
   case "${1:-}" in
     state-md-path) iroha_state_md_path "${2:-}" ;;
-    decisions-md-path) iroha_decisions_md_path "${2:-}" ;;
     saved-dir) iroha_saved_dir ;;
     get) iroha_config_get "${2:-}" ;;
     set) iroha_config_set "${2:-}" "${3:-}" ;;

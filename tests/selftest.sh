@@ -114,17 +114,6 @@ rm -f "$PROJ/.iroha/state.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl"
 eq hook-silent-when-empty "" "$(run_hook)"
 rm -rf "$HOOKHOME" "$HOOKDATA" "$PROJ"
 
-echo "=== recall (local, offline decision search) ==="
-RECPROJ=$(mktemp -d "${TMPDIR:-/tmp}/iroha-rec.XXXXXX")
-DEC="$RECPROJ/.iroha/decisions.md"
-mkdir -p "$(dirname "$DEC")"
-printf '## Prisma を採用\n- Why: 型安全\n- Rejected: Drizzle\n\n## relation は使わない\n- Why: MCP バグ\n- Rejected: native relation\n' >"$DEC"
-recall_out=$(CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "$RECPROJ" "drizzle")
-has recall-hit "Prisma を採用" "$recall_out"
-hasnt recall-miss "relation は使わない" "$recall_out"
-miss_out=$(CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "$RECPROJ" "kubernetes")
-hasnt recall-empty "Prisma" "$miss_out"
-rm -rf "$RECPROJ"
 
 echo "=== result: $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ]

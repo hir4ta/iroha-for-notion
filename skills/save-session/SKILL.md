@@ -119,22 +119,17 @@ For each decision, `notion-create-pages` under `decisions_ds_id`. `Name` = a sho
 array string from architecture / dependency / process), `Session` = the Session page URL
 from step 5, `"date:Date:start"`.
 
-**Dedup & supersede.** Before inserting, check the local decision log (and
-`notion-search`) for the same topic. If it already exists unchanged, do **not** insert
-a duplicate — only record decisions actually made this session. If this session
-**reverses or changes** a prior decision, set the old row's `Status` = `Superseded`
-with `notion-update-page` (do **not** overwrite it — the change of mind is itself
-memory worth recalling) and create the new decision alongside it.
+**Dedup & supersede.** A decision's `Name` is `<topic>: <choice>`, so the **topic
+prefix is the dedup key.** Before inserting, `notion-search` the Decisions DB for the
+topic and check whether an `Active` row whose `Name` starts with the same `<topic>:`
+already exists. If it does and is unchanged, do **not** insert a duplicate. If this
+session **reverses or changes** it, set that old row's `Status` = `Superseded` with
+`notion-update-page` (do **not** overwrite it — the change of mind is itself memory
+worth recalling) and create the new decision alongside it.
 
-Also append each decision to the **local decision log** so `/iroha:recall`
-can search it for free (offline; the Notion MCP query tools need a paid plan):
-
-```bash
-DEC="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh" decisions-md-path "$PWD")"
-mkdir -p "$(dirname "$DEC")"
-printf '## %s\n- Date: %s\n- Why: %s\n- Rejected: %s\n- Session: %s\n\n' \
-  "<decision>" "<date>" "<rationale>" "<alternatives>" "<session-url>" >>"$DEC"
-```
+Decisions live **only in Notion** (the single source of truth). Do not write a local
+decision mirror — recall reads decisions live via `notion-search`, so there is no local
+copy to drift out of sync.
 
 ## 7. Chat highlights — curated, not the full transcript
 
@@ -159,16 +154,23 @@ re-listing them here only duplicates the latest Session row). State body (monoch
 latest summary + date, a **Recent sessions** list (newest first, links to the last few
 Session pages), the carried-over **Unfinished / Next** list, and a link to the Decisions
 DB.
+
+**Triage the carry-over** every time (this keeps `Unfinished` from rotting into a
+graveyard): for each item carried from the prior State, decide done / still-active /
+stale-drop — keep only what is genuinely still pending, and mark anything carried for
+**2+ sessions** so the team notices stale work. State is fully replaced each save, so
+this triage cannot drift.
 - If get-state is empty: `notion-create-pages` under `container_page_id`
   (title `State — <project>`, icon `https://www.notion.so/icons/target_gray.svg`),
   then `bash …/config.sh set-state "$PROJ" "<page_id>"`.
 - Else: `notion-update-page` `replace_content` on that page id.
 - **Also mirror the State body into the repo** so a teammate's SessionStart hook can
-  inject it offline (it lives at `<repo>/.iroha/state.md`):
+  inject it offline (it lives at `<repo>/.iroha/state.md`, overwritten each save so it
+  never drifts):
   `MD="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh" state-md-path "$PWD")"; mkdir -p "$(dirname "$MD")"; printf '%s' "<state body>" > "$MD"`.
-  This file and the decision log (step 6) both live under `.iroha/` in the repo —
-  **remind the user to commit `.iroha/`** so the memory reaches teammates (Notion stays
-  the rich source of truth; the repo mirror is what the offline hook + grep read).
+  **Remind the user to commit `.iroha/state.md`** so the memory reaches teammates. Notion
+  is the single source of truth for decisions/sessions (recall reads it via
+  `notion-search`); the repo only holds this State mirror for the offline hook.
 
 ## 9. Mark saved + report
 
