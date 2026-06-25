@@ -55,7 +55,7 @@ if [ "${1:-}" = "--selfcheck" ]; then
     elif command -v gtimeout >/dev/null 2>&1; then TO="gtimeout"; fi
     dsid=$(bash "$L" get decisions_ds_id 2>/dev/null)
     if [ -n "$TO" ] && [ -n "$dsid" ]; then
-      r=$(IROHA_RECALL_CHILD=1 "$TO" 30 claude -p "Call notion-search once over \"collection://${dsid}\" with query ping, then reply READY." \
+      r=$(IROHA_RECALL_CHILD=1 "$TO" "${IROHA_RECALL_LIVE_TIMEOUT:-90}" claude -p "Call notion-search once over \"collection://${dsid}\" with query ping, then reply READY." \
             --model haiku --permission-mode dontAsk --allowedTools "mcp__notion__notion-search" 2>/dev/null)
       rc=$?
       if [ "$rc" -eq 0 ] && [ -n "$r" ]; then p PASS "live claude + Notion MCP round-trip"; else p FAIL "live claude + Notion MCP round-trip"; ok=0; fi
