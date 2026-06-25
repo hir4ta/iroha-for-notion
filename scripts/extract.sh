@@ -10,9 +10,10 @@
 #   commands  unique Bash commands (first line of each)
 #   meta      JSON {title, started, ended, cwd, gitBranch, model, sessionId}
 #   prompts   the human's actual messages, in order — the You-side anchor for chat
-#             highlights. Tool results, sidechains, and system-injected wrappers
-#             (<task-notification> / <command-*> / <system-reminder>) are excluded, so
-#             save-session never has to invent a "You" line from memory.
+#             highlights. Tool results, sidechains, harness meta turns (isMeta — e.g. the
+#             "Your tool call was malformed … retry." injection), and system-injected
+#             wrappers (<task-notification> / <command-*> / <system-reminder>) are excluded,
+#             so save-session never has to invent or mis-attribute a "You" line.
 #   stats     JSON {userTurns, assistantTurns, toolCalls, filesEdited, bashCommands,
 #             durationMin, startedAt, endedAt} — the numbers for a metrics dashboard.
 #   tools     per-tool usage tally, most-used first (e.g. "- `Bash` ×12").
@@ -68,6 +69,7 @@ case "$cmd" in
   prompts)
     records | jq -rs '
       [ .[] | select(.isSidechain != true) | select(.type == "user")
+        | select(.isMeta != true)
         | select(.message.content | type == "string") | .message.content
         | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
         | gsub("\\s+"; " ") | gsub("^ +| +$"; "")
@@ -93,6 +95,7 @@ case "$cmd" in
   stats)
     records | jq -s '
       def realuser: select(.isSidechain != true) | select(.type == "user")
+        | select(.isMeta != true)
         | select(.message.content | type == "string")
         | select(.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not);
       def asof: .timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
@@ -120,7 +123,7 @@ case "$cmd" in
   chat)
     records | jq -rs '
       [ .[] | select(.isSidechain != true)
-        | if (.type == "user" and (.message.content | type == "string")
+        | if (.type == "user" and (.isMeta != true) and (.message.content | type == "string")
               and (.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not))
           then { role: "You", text: .message.content }
           elif (.type == "assistant")
