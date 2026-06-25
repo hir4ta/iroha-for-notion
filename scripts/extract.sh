@@ -69,7 +69,7 @@ case "$cmd" in
     records | jq -rs '
       [ .[] | select(.isSidechain != true) | select(.type == "user")
         | select(.message.content | type == "string") | .message.content
-        | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
+        | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
         | gsub("\\s+"; " ") | gsub("^ +| +$"; "")
         | select(. != "") | .[0:200]
       ] | .[] | "- " + .
@@ -94,7 +94,7 @@ case "$cmd" in
     records | jq -s '
       def realuser: select(.isSidechain != true) | select(.type == "user")
         | select(.message.content | type == "string")
-        | select(.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|bash-input|bash-stdout|user-prompt-submit-hook)") | not);
+        | select(.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not);
       def asof: .timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
       (map(select(.timestamp)) | sort_by(.timestamp)) as $t
       | {
@@ -121,7 +121,7 @@ case "$cmd" in
     records | jq -rs '
       [ .[] | select(.isSidechain != true)
         | if (.type == "user" and (.message.content | type == "string")
-              and (.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|bash-input|bash-stdout|user-prompt-submit-hook)") | not))
+              and (.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not))
           then { role: "You", text: .message.content }
           elif (.type == "assistant")
           then (.message.content[]? | select(.type == "text") | { role: "Claude", text: .text })

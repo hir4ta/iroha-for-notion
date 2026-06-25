@@ -79,7 +79,7 @@ root="${cwd:-$PWD}"
 gate="${prompt#"${prompt%%[![:space:]]*}"}"
 case "$gate" in
   /*) exit 0 ;;
-  '<task-notification'*|'<system-reminder'*|'<command-message'*|'<command-name'*|'<local-command-stdout'*|'<bash-input'*|'<bash-stdout'*|'<user-prompt-submit-hook'*) exit 0 ;;
+  '<task-notification'*|'<system-reminder'*|'<command-message'*|'<command-name'*|'<local-command-stdout'*|'<local-command-caveat'*|'<bash-input'*|'<bash-stdout'*|'<user-prompt-submit-hook'*) exit 0 ;;
 esac
 
 # 3. Consent: off unless /iroha:init enabled recall (a fresh install pays nothing per prompt).

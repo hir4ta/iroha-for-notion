@@ -8,3 +8,4 @@
 {"type":"assistant","isSidechain":true,"sessionId":"s1","message":{"role":"assistant","content":[{"type":"text","text":"SIDECHAIN should not appear"}]}}
 {"type":"assistant","isSidechain":false,"timestamp":"2026-06-24T01:05:00Z","sessionId":"s1","message":{"role":"assistant","content":[{"type":"text","text":"Done, the endpoint is added."}]}}
 {"type":"user","isSidechain":false,"sessionId":"s1","message":{"role":"user","content":"<task-notification>\nNOISE-TASKNOTIF should be excluded\n</task-notification>"}}
+{"type":"user","isSidechain":false,"sessionId":"s1","message":{"role":"user","content":"<local-command-caveat>NOISE-CAVEAT should be excluded (a /clear wrapper, not a real You message)</local-command-caveat>"}}

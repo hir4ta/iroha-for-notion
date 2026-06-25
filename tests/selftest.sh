@@ -64,6 +64,7 @@ prompts=$(bash "$EXTRACT" prompts "$FIX")
 has prompts-human "Please add a login endpoint" "$prompts"
 hasnt prompts-no-toolresult "FILE WRITTEN" "$prompts"
 hasnt prompts-no-tasknotif "NOISE-TASKNOTIF" "$prompts"
+hasnt prompts-no-caveat "NOISE-CAVEAT" "$prompts"
 
 echo "=== extract stats (metrics dashboard numbers) ==="
 stats=$(bash "$EXTRACT" stats "$FIX")
@@ -83,6 +84,7 @@ has chat-claude "the endpoint is added" "$chat"
 hasnt chat-no-thinking "SECRET THOUGHTS" "$chat"
 hasnt chat-no-toolresult "FILE WRITTEN" "$chat"
 hasnt chat-no-sidechain "SIDECHAIN" "$chat"
+hasnt chat-no-caveat "NOISE-CAVEAT" "$chat"
 
 echo "=== extract tolerates truncated / malformed lines ==="
 BROKEN=$(mktemp "${TMPDIR:-/tmp}/iroha-broken.XXXXXX")
