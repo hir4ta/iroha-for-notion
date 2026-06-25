@@ -33,6 +33,14 @@ All notable changes to iroha are documented here. The format loosely follows
   (rationale / summary condensed to ≤160 chars) so BM25 can match a prompt against the *reason*
   a decision was made, not just its title. It is regenerated on every save (like an embedding),
   so Notion stays the single source of truth and it cannot drift.
+- **Save-backlog reminder** (`hooks/session-start.sh`): the SessionStart save reminder now
+  surfaces *every* substantive session left unsaved **since the last save** (not just the single
+  most recent one), each listed by date + title, and phrases it so Claude proactively offers to
+  capture them with `/iroha:save-session`. Trivial Q&A sessions (no file edits, little tool use)
+  are filtered out so the backlog stays signal, not noise; the scan is bounded to stay within the
+  hook's 5s budget. This keeps a forgotten save from leaving a hole in the living memory **without
+  ever saving unattended** — the human + Claude stay in the loop (consistent with the
+  "自動保存: 当面見送り" decision; this strengthens the reminder, it does not auto-save).
 - **Recall quality eval harness** (`tests/recall-eval.sh`, `npm run test:recall`, in CI): a
   golden set of realistic prompts → expected decision, scoring **Recall@k / MRR / abstention**
   on the real index — so "does the memory get more useful as it grows?" is a measured curve and

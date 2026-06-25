@@ -62,18 +62,47 @@ ${recent}
   fi
 fi
 
-# 2. Save reminder: is the most recent prior transcript unsaved? (Skipped on compaction —
-# that is a mid-session restart, not a fresh start.)
+# 2. Save-backlog reminder: surface EVERY substantive session left unsaved since the last save —
+# not just the single most recent one — so a forgotten save does not leave a hole in the "living
+# memory", and make it actionable so Claude proactively offers to capture them. This never saves
+# unattended: the human + Claude stay in the loop (consistent with decision "自動保存: 当面見送り";
+# we only make forgetting loud and the backlog complete). Skipped on compaction (a mid-session
+# restart, not a fresh start).
 if [ "$source" != "compact" ]; then
-  last=""
+  saved_dir="$(iroha_saved_dir)"
+  ex="${CLAUDE_PLUGIN_ROOT}/scripts/extract.sh"
+  # Boundary = the newest "saved" marker. Sessions older than the last save were left unsaved
+  # deliberately, so only the backlog *since* the last save is surfaced (no nagging about ancient
+  # trivia). Empty when nothing was ever saved -> consider all candidates (capped below).
+  newest_marker=""
+  for m in "$saved_dir"/*; do
+    [ -e "$m" ] || continue
+    if [ -z "$newest_marker" ] || [ "$m" -nt "$newest_marker" ]; then newest_marker="$m"; fi
+  done
+  backlog=""; found=0; scanned=0
   for f in "$projdir"/*.jsonl; do
     [ -e "$f" ] || continue
-    case "$f" in */"${sid}.jsonl") continue ;; esac
-    if [ -z "$last" ] || [ "$f" -nt "$last" ]; then last="$f"; fi
+    case "$f" in */"${sid}.jsonl") continue ;; esac                     # skip the current session
+    base=$(basename "$f" .jsonl)
+    [ -e "$saved_dir/$base" ] && continue                               # skip already-saved sessions
+    [ -n "$newest_marker" ] && [ ! "$f" -nt "$newest_marker" ] && continue  # only the backlog since the last save
+    scanned=$((scanned + 1)); [ "$scanned" -gt 8 ] && break             # bound the work (hook has a 5s budget)
+    # Substantive? Skip trivial Q&A (no edits, little tool use) so the backlog stays signal, not noise.
+    st=$(bash "$ex" stats "$f" 2>/dev/null)
+    fe=$(printf '%s' "$st" | jq -r '.filesEdited // 0' 2>/dev/null); fe=${fe:-0}
+    tc=$(printf '%s' "$st" | jq -r '.toolCalls // 0' 2>/dev/null); tc=${tc:-0}
+    { [ "$fe" -ge 1 ] 2>/dev/null || [ "$tc" -ge 10 ] 2>/dev/null; } || continue
+    # Label: the session's title (meta.title falls back to the first human message) prefixed by date.
+    mt=$(bash "$ex" meta "$f" 2>/dev/null)
+    title=$(printf '%s' "$mt" | jq -r '.title // "session"' 2>/dev/null)
+    day=$(printf '%s' "$mt" | jq -r '(.started // "")[0:10]' 2>/dev/null)
+    backlog="${backlog}
+- ${day:+$day — }${title}  (${base})"
+    found=$((found + 1)); [ "$found" -ge 5 ] && break
   done
-  if [ -n "$last" ] && [ ! -e "$(iroha_saved_dir)/$(basename "$last" .jsonl)" ]; then
+  if [ "$found" -gt 0 ]; then
     ctx="${ctx}
-(The previous session was not saved to iroha — run /iroha:save-session to capture it.)"
+(iroha — ${found} earlier session(s) with substantive work are not saved to Notion yet. Offer to save them with /iroha:save-session:${backlog})"
   fi
 fi
 

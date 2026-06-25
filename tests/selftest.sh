@@ -125,7 +125,16 @@ HOOKDATA=$(mktemp -d "${TMPDIR:-/tmp}/iroha-data.XXXXXX")
 PROJ=$(mktemp -d "${TMPDIR:-/tmp}/iroha-proj.XXXXXX")   # repo root; State mirror at $PROJ/.iroha/state.md
 HASH=$(printf '%s' "$PROJ" | sed 's#/#-#g')
 mkdir -p "$HOOKHOME/.claude/projects/$HASH" "$PROJ/.iroha"
-: >"$HOOKHOME/.claude/projects/$HASH/old.jsonl"
+# old.jsonl: a SUBSTANTIVE unsaved session (1 file edited) -> must be surfaced in the save backlog.
+printf '%s\n' \
+  '{"type":"user","timestamp":"2026-06-20T10:00:00.000Z","isSidechain":false,"message":{"role":"user","content":"Fix the parser bug"}}' \
+  '{"type":"assistant","timestamp":"2026-06-20T10:01:00.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"src/parser.ts"}}]}}' \
+  >"$HOOKHOME/.claude/projects/$HASH/old.jsonl"
+# trivial.jsonl: a quick Q&A with no edits / little tool use -> must NOT be surfaced (signal, not noise).
+printf '%s\n' \
+  '{"type":"user","timestamp":"2026-06-21T09:00:00.000Z","isSidechain":false,"message":{"role":"user","content":"TRIVIAL-QA what is the time"}}' \
+  '{"type":"assistant","timestamp":"2026-06-21T09:00:30.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"It is morning."}]}}' \
+  >"$HOOKHOME/.claude/projects/$HASH/trivial.jsonl"
 printf 'STATE-CONTENT-XYZ' >"$PROJ/.iroha/state.md"
 run_hook() {
   printf '{"cwd":"%s","session_id":"cur"}' "$PROJ" |
@@ -134,11 +143,13 @@ run_hook() {
 }
 out=$(run_hook)
 has hook-injects-state "STATE-CONTENT-XYZ" "$out"
-has hook-reminds-unsaved "not saved" "$out"
+has hook-backlog-surfaces "Fix the parser bug" "$out"      # the substantive unsaved session is listed
+has hook-backlog-actionable "save-session" "$out"          # and the reminder is actionable
+hasnt hook-backlog-skips-trivial "TRIVIAL-QA" "$out"       # the trivial Q&A session is NOT listed (signal, not noise)
 has hook-open-count "Open items carried over" "$out"
 has hook-json-shape "hookSpecificOutput" "$out"
 mkdir -p "$HOOKDATA/saved" && : >"$HOOKDATA/saved/old"
-hasnt hook-no-remind-when-saved "not saved" "$(run_hook)"
+hasnt hook-no-remind-when-saved "not saved to Notion" "$(run_hook)"
 # compaction restart (source=compact) re-injects THIS session's conversation from its transcript
 printf '{"type":"user","isSidechain":false,"message":{"role":"user","content":"COMPACT-RECAP-PROMPT please"}}\n' >"$HOOKHOME/.claude/projects/$HASH/cur.jsonl"
 cout=$(printf '{"cwd":"%s","session_id":"cur","source":"compact"}' "$PROJ" |
@@ -147,7 +158,8 @@ cout=$(printf '{"cwd":"%s","session_id":"cur","source":"compact"}' "$PROJ" |
 has hook-compact-recap "re-injected after compaction" "$cout"
 has hook-compact-prompt "COMPACT-RECAP-PROMPT" "$cout"
 rm -f "$HOOKHOME/.claude/projects/$HASH/cur.jsonl"
-rm -f "$PROJ/.iroha/state.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl"
+rm -f "$PROJ/.iroha/state.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl" \
+  "$HOOKHOME/.claude/projects/$HASH/trivial.jsonl"
 eq hook-silent-when-empty "" "$(run_hook)"
 # missing CLAUDE_PLUGIN_ROOT must exit 0 silently, not crash under set -u
 env -u CLAUDE_PLUGIN_ROOT HOME="$HOOKHOME" bash "$HERE/../hooks/session-start.sh" <<<'{"cwd":"/x","session_id":"y"}' >/dev/null 2>&1
