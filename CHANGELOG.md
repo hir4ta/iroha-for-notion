@@ -3,6 +3,48 @@
 All notable changes to iroha are documented here. The format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+
+- **Local enumeration index** (`scripts/_lib/index.sh`, repo-committed `.iroha/index.ndjson`):
+  a keys-only record (id / topic / status / date — no content) of every decision and
+  session. On the Notion free plan `query-data-sources` is paid, so the DBs cannot be
+  enumerated; this index lets dedup, supersede, and audit reason over the *complete* set
+  instead of `notion-search`'s top-N. Notion stays the single source of truth for content.
+- **Enforced just-in-time recall** (`hooks/recall-inject.sh`, a `UserPromptSubmit` hook):
+  spawns one bounded, read-only headless `claude -p` that searches the project's memory for
+  decisions relevant to the prompt and injects the top hits. Fully fail-safe — recursion
+  guard, prompt gate, per-prompt cache, hard timeout, and degrade-to-nothing on any failure
+  (no CLI / no `timeout` / not initialized / error). Disable with `IROHA_RECALL_DISABLE=1`;
+  tune with `IROHA_RECALL_TIMEOUT` (default 20s).
+- **Write-time dedup guard** in `save-session`: consults the index before creating a
+  Decision, blocks granularity pollution at the source, and supersedes/merges near-dups.
+- Full chat is now stored as a **child page** of the Session (paged out, real and complete)
+  — never an inline placeholder.
+
+### Changed
+
+- `recall` ranks hits by relevance + recency + importance and presents a small, edges-first
+  set; it abstains honestly ("no record for these terms") instead of fabricating, and scopes
+  every negative to the search terms (free-plan search is not a complete scan).
+- `audit` enumeration is now **complete** via the index (duplicate-Active and orphan checks
+  are exhaustive, not heuristic).
+- Failures are recorded as first-class, recallable entries (symptom → cause → fix) so a
+  future session surfaces a dead-end before repeating it.
+- **Language boundary tightened**: all distribution code/templates are English; `init`
+  localizes the materialized `Type` option labels and the entry-point guide to the user's
+  conversation language, while structural keys (property names, `Status`, `Project`,
+  `Languages`) stay English.
+
+### Fixed
+
+- A Session's `Full chat` toggle could hold a fabricated placeholder ("…full chat
+  continues…") instead of the real chat; now structurally prevented, and the one affected
+  page was repaired with its real 103-turn chat.
+- Demoted a granularity-polluting decision (a display tweak) out of the canonical Decisions
+  DB to `Status = Superseded`.
+
 ## [0.2.0] — 2026-06-25
 
 ### Added
