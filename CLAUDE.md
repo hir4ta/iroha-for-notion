@@ -60,6 +60,6 @@ SSE エンドポイントはレガシーなので使わない。
 
 - API 直叩き / トークン管理 (Notion MCP に統一)。
 - relation プロパティ (MCP の relation 書き込みに既知バグ → URL 連結で回避)。
-- SessionEnd 自動保存のための headless claude (複雑化 → Phase 3)。
-- Stop ブロックによる保存強制 (ユーザーを閉じ込める)。hooks は "リマインド" まで。
+- SessionEnd 自動保存のための headless claude (複雑化 → Phase 3)。※JIT recall では bounded headless `claude -p` を採用済 (再帰ガード/timeout/degrade・未接続は degrade)。
+- Stop ブロックによる保存強制 (ユーザーを閉じ込める)。保存 hook は "リマインド" まで (recall は JIT で enforced)。
 - 将来用の TS src / 投機的オプション (YAGNI)。

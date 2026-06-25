@@ -23,14 +23,17 @@
   (言語・lib・CI・mermaid 図、手動更新 `/iroha:project`)。Projects は 1 行=1 プロジェクトの共有 DB、
   `Languages` のみ multi_select、横断検索 (同言語/同 lib の他プロジェクト) に使う。Architecture には
   「なぜ」を書かず Decisions へリンク。
-- **リコールは `notion-search` 一本** (無料プランで動く。`query-database-view` /
-  `query-data-sources` は有料なので使わない。オフライン grep ミラーは持たない＝単一の真実)。
-  `/iroha:recall` は Sessions/Decisions を semantic 検索し、過去の決定・**類似実装**を引く
-  (使うほど育つチーム記憶の中核)。supersede は Decision 名の `トピック:` 前方一致で既存 Active を引く。
-- **ミラーは repo の `.iroha/state.md` のみ**（State をコミットし teammate は pull で共有）。
-  SessionStart hook は Notion 非到達なので repo の `state.md` を注入。**決定はローカルにミラーしない**
-  (notion-search が正本を直接引く＝二重の真実を持たずドリフトを断つ)。config.json / saved マーカーは
-  $HOME (マシン固有)。State の未完了は save 毎にトリアージ (完了/陳腐を落とす)。
+- **リコールは `notion-search` 主体＋keys-only ローカル index で補完** (無料プランで
+  `query-data-sources` が有料＝全件列挙不能なので、`.iroha/index.ndjson` に id/topic/status/date
+  のみを持ち dedup・abstention・audit を**完全列挙**で行う。本文は Notion 正本＝二重の真実にしない)。
+  `/iroha:recall` は Sessions/Decisions を semantic 検索し relevance+recency+importance で少数を
+  edges-first に返す (該当無しは検索語スコープで正直に abstain)。supersede は `トピック:` 前方一致＋
+  index で既存 Active を引く。
+- **repo ミラーは `.iroha/state.md`（State 全文）と `.iroha/index.ndjson`（keys-only 列挙）の 2 つ**
+  （ともに commit し teammate は pull で共有）。SessionStart hook は Notion 非到達なので `state.md`
+  を注入。**決定の本文はローカルに持たない**（Notion 正本）が、無料プランの列挙不能を補う keys-only
+  index（id/topic/status/date のみ・本文なし）は持つ＝本文の二重化ではないのでドリフトしない。
+  config.json / saved マーカーは $HOME (マシン固有)。State の未完了は save 毎にトリアージ。
 - **命名と履歴**: Session = `YYYY-MM-DD — 主題`、Decision = `トピック: 選択` (理由は Rationale、
   却下案は Alternatives 欄)。決定を覆す時は旧行を **Status=Superseded** にし上書きしない (心変わりも
   記憶)。Session ページのセクション構造は固定 (Metrics ダッシュボードは常設、任意は
@@ -38,9 +41,11 @@
 - **冪等性**: `/init` は既存コンテナ/DB を検出したら再利用 (チーム参加 = 同じコマンド)。
   fallback = 複製可能 Notion テンプレート方式。
 - **シークレットを持たない**。Notion 認証は MCP OAuth で完結。userConfig / env トークンは無し。
-- **フックは強制でなくリマインド**。保存忘れは SessionStart で検知して注意喚起するに留める。
-  Stop の exit 2 ブロックは使わない。State ミラー注入時に「実装前に `/iroha:recall` で過去の
-  類似事例を確認」も促す。hook の注入テキスト（wrapper）は **配布コードなので英語**、本文の
+- **保存はリマインド・recall は enforced**。保存強制はしない (Stop の exit 2 ブロックは使わず
+  ユーザーを閉じ込めない)；保存忘れは SessionStart で注意喚起。一方 recall は **UserPromptSubmit の
+  enforced JIT 注入** (`recall-inject.sh` が bounded headless `claude -p` を発火・再帰ガード/timeout/
+  cache/degrade 完備、`claude` や `timeout` 不在・未接続では無害に degrade) で、各プロンプトに関連
+  決定を proactively 注入する。hook の注入テキスト（wrapper）は **配布コードなので英語**、本文の
   State は会話言語（= ユーザーデータ）。未完了 `- [ ]` 件数のバナーも算出して添える。
   `source=compact`（`/compact`・auto-compact 後）は現在セッションのトランスクリプトから会話
   (prompts ＋ chat 直近) を再注入してスレッドを復元する（行単位 cap でマルチバイト非分割。Notion
