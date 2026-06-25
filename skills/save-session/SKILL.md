@@ -43,11 +43,13 @@ E="${CLAUDE_PLUGIN_ROOT}/scripts/extract.sh"
 bash "$E" meta     "$TX"   # JSON: title, started, ended, cwd, gitBranch, model
 bash "$E" files    "$TX"
 bash "$E" commands "$TX"
+bash "$E" prompts  "$TX"   # the human's real messages — the You-side anchor (step 7)
 git config user.name 2>/dev/null || echo "unknown"   # Author
 ```
 
-(The full transcript is large and is **not** stored; you compose curated chat
-highlights from memory — see step 7.)
+(The full transcript is large and is **not** stored. The chat highlights (step 7) come
+from your memory of the session, but the **You** side is anchored to the deterministic
+`prompts` output above — never invented.)
 
 ## 4. Compose the content (from your memory of the session + the extracted data)
 
@@ -94,8 +96,9 @@ show Project / Status / Type / Date / Branch / Author at the top:
    (columns: Decision / Why / Rejected alternatives);
 4. `## Progress` as a green_bg callout (Done) + an orange_bg callout (Unfinished, `- [ ]`);
 5. `## Highlights` — 5-8 pivotal exchanges as alternating chat-style callouts
-   (You = `blue_bg`, Claude = `gray_bg`), paraphrased and concise — **not** the full
-   chat (see step 7);
+   (You = `blue_bg`, Claude = `gray_bg`); the **You** lines come from the `prompts`
+   extract (real messages, never invented), Claude lines are paraphrased — **not** the
+   full chat (see step 7);
 6. `## Rules changed` *(optional — only when this session established or changed a rule)*
    as a `<callout color="gray_bg">`; omit the whole section when no rule changed;
 7. `## Failures` *(optional — only when there were notable pitfalls)* as a
@@ -137,15 +140,22 @@ Decisions live **only in Notion** (the single source of truth). Do not write a l
 decision mirror — recall reads decisions live via `notion-search`, so there is no local
 copy to drift out of sync.
 
-## 7. Chat highlights — curated, not the full transcript
+## 7. Chat highlights — curated, anchored to real messages
 
-The full chat is **not** stored: it is too large to append through the MCP in one
-session (the content would pass through the model's context twice). Instead, from
-**your memory of this session**, pick the **5-8 pivotal You<->Claude exchanges** that
-show how the key decisions were reached, and render them as the `## Highlights`
-section (step 5): alternating chat-style callouts, You = `blue_bg`, Claude =
-`gray_bg`, paraphrased and concise so it reads like a short chat. Do **not** dump the
-whole transcript, and do **not** flatten the highlights into prose.
+The full chat is **not** stored (too large to append through the MCP in one session).
+Build the `## Highlights` section instead, but **anchor it to the deterministic
+`prompts` output from step 3 — those are the human's actual words.**
+
+- **You callouts** — use the real messages from `prompts`, condensed but **never
+  invented**. Do not write a "You" line the human did not actually say, and do not turn
+  your own analysis into a question they "asked". Pick the 5-8 that drove the key
+  decisions.
+- **Claude callouts** — paraphrase your replies concisely, and report what *actually*
+  happened: **do not inflate success.** Keep the dead-ends, the corrections, and the
+  things you decided NOT to do at the same weight as the wins — a highlight reel that
+  shows only the clean path is a misleading memory.
+- Render as alternating chat-style callouts (You = `blue_bg`, Claude = `gray_bg`); do
+  **not** dump the whole transcript or flatten it into prose.
 
 ## 8. Update the Project State page (continuity core)
 

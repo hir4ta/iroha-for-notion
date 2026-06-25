@@ -4,11 +4,15 @@
 # noise-free, deterministic views for /iroha:save-session. Read-only.
 # stdout = the requested view only; diagnostics go to stderr.
 #
-# Usage: extract.sh <files|commands|meta> <transcript.jsonl>
+# Usage: extract.sh <files|commands|meta|prompts> <transcript.jsonl>
 #
 #   files     unique files touched via Edit/Write/MultiEdit/NotebookEdit
 #   commands  unique Bash commands (first line of each)
 #   meta      JSON {title, started, ended, cwd, gitBranch, model, sessionId}
+#   prompts   the human's actual messages, in order — the You-side anchor for chat
+#             highlights. Tool results, sidechains, and system-injected wrappers
+#             (<task-notification> / <command-*> / <system-reminder>) are excluded, so
+#             save-session never has to invent a "You" line from memory.
 #
 # Transcripts can be truncated (a crash / interrupt leaves an unfinished last line),
 # so each line is parsed independently with `fromjson?` — malformed lines are skipped,
@@ -19,7 +23,7 @@ cmd="${1:-}"
 file="${2:-}"
 
 if [ -z "$cmd" ] || [ -z "$file" ]; then
-  echo "usage: extract.sh <files|commands|meta> <transcript.jsonl>" >&2
+  echo "usage: extract.sh <files|commands|meta|prompts> <transcript.jsonl>" >&2
   exit 2
 fi
 if [ ! -f "$file" ]; then
@@ -53,6 +57,16 @@ case "$cmd" in
         | .message.content[]? | select(.type == "tool_use") | select(.name == "Bash")
         | (.input.command // empty) | select(. != null) | split("\n")[0]
       ] | unique | .[] | "- `" + . + "`"
+    '
+    ;;
+  prompts)
+    records | jq -rs '
+      [ .[] | select(.isSidechain != true) | select(.type == "user")
+        | select(.message.content | type == "string") | .message.content
+        | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
+        | gsub("\\s+"; " ") | gsub("^ +| +$"; "")
+        | select(. != "") | .[0:200]
+      ] | .[] | "- " + .
     '
     ;;
   meta)

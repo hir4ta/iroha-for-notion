@@ -59,6 +59,12 @@ cmds=$(bash "$EXTRACT" commands "$FIX")
 has cmd-bash "npm test" "$cmds"
 hasnt cmd-firstline-only "echo done" "$cmds"
 
+echo "=== extract prompts (human's real messages — the You-anchor) ==="
+prompts=$(bash "$EXTRACT" prompts "$FIX")
+has prompts-human "Please add a login endpoint" "$prompts"
+hasnt prompts-no-toolresult "FILE WRITTEN" "$prompts"
+hasnt prompts-no-tasknotif "NOISE-TASKNOTIF" "$prompts"
+
 echo "=== extract tolerates truncated / malformed lines ==="
 BROKEN=$(mktemp "${TMPDIR:-/tmp}/iroha-broken.XXXXXX")
 cat "$FIX" >"$BROKEN"

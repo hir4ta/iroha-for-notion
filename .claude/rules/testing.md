@@ -5,7 +5,9 @@
 - 抽出ロジックは `tests/fixtures/` に**実トランスクリプトと同形の JSONL**を置いて検証する。
   最低限おさえる観点:
   - `type=user` の content が文字列 (= 人間の発言) と、配列の `tool_result` (= ツール出力) の判別
-  - 整形チャット (human 発言 + assistant text のみ、thinking/tool_use/tool_result 除外)
+  - 人間の実発言の決定論抽出 (`prompts`): 文字列 content のみ。`tool_result` / sidechain /
+    システム注入ラッパー (`<task-notification>` / `<command-*>` / `<system-reminder>`) を除外
+    (= 会話ハイライトの You アンカー。Claude が You 発言を創作しないための地上の真実)
   - 変更ファイル (Edit/Write tool_use)・主要コマンド (Bash tool_use) の抽出
 - **Notion 書き込みは Claude が SKILL 内で MCP ツールを呼ぶため自動テスト対象外** (組み立てる
   bash 関数が無い)。決定論部分 (`extract.sh` / `config.sh` / `session-start.sh`) のみ oracle で
