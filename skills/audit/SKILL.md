@@ -15,20 +15,28 @@ Report in the **user's conversation language**.
 ## 1. Preconditions
 
 ```bash
-L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh"
+L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
 bash "$L" get decisions_ds_id    # empty -> tell the user to run /iroha:init, then stop
 bash "$L" get session_ds_id
 bash "$L" get-state "$PWD"        # the State page id (may be empty on a fresh project)
+bash "$IDX" list "$PWD" decision  # COMPLETE list of decision keys — the enumeration search lacks
+bash "$IDX" list "$PWD" session   # COMPLETE list of session keys
 ```
 
 ## 2. Run the checks (read-only)
 
-Enumerate via `notion-search` (broad queries over each data source, `page_size` ~25),
-`notion-fetch` the hits you need to inspect, and collect findings:
+**Enumerate from the local index** (`index.sh list` above) — it is the *complete* set of
+decision/session keys, which free-plan `notion-search` cannot reproduce. `notion-fetch` each
+id that needs its content inspected, and collect findings. (If the index is empty or stale —
+an older workspace created before the index existed — fall back to `notion-search` and **say
+so**: results are then best-effort, not complete. Offer to backfill: fetch the known rows and
+`index.sh upsert` each into the index so future audits are exhaustive.)
 
-- **A. Duplicate Active decisions** — a decision `Name` is `<topic>: <choice>`. Two
-  `Status = Active` rows sharing the same `<topic>:` prefix is a conflict: one should be
-  `Superseded`. (severity: high — this is the defect that most rots recall.)
+- **A. Duplicate Active decisions** — two `Status = Active` rows sharing the same `<topic>`
+  are a conflict (one should be `Superseded`). Now **exhaustive** via the index — every
+  conflicted topic, not just what search surfaced:
+  `bash "$IDX" list "$PWD" decision | jq -r 'select(.status=="Active")|.topic' | sort | uniq -d`
+  (severity: high — the defect that most rots recall.)
 - **B. Should-be-superseded** — an `Active` decision whose `Rationale` is contradicted by
   a newer `Active` decision on the same topic, or which a later Session's decisions
   reversed. Flag the older one. (high)
@@ -73,8 +81,11 @@ report), apply **only the safe, reversible** fixes and re-report each:
 
 ## Notes
 
-- audit is heuristic (semantic search, not a full table scan — `query-data-sources` is a
-  paid feature). It surfaces likely problems; the engineer confirms. Better a flagged
-  false positive than a silent rot.
+- With the local index, decision/session **enumeration is now complete** (not just search's
+  top-N), so the duplicate-Active (A) and orphan (C) checks are exhaustive rather than
+  heuristic. The *content* checks (B contradiction, F granularity) still need judgment via
+  `notion-fetch`. Reconcile drift: if `index.sh list` and Notion disagree (an id 404s, or a
+  status differs), fix the index with `index.sh upsert`. Better a flagged false positive than
+  silent rot.
 - Re-run after big sessions, before onboarding a teammate, or when recall starts
   returning conflicting answers.

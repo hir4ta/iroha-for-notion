@@ -173,22 +173,44 @@ For each decision, `notion-create-pages` under `decisions_ds_id`. `Name` = a sho
 array string from architecture / dependency / process), `Session` = the Session page URL
 from step 5, `"date:Date:start"`.
 
-**Dedup & supersede.** A decision's `Name` is `<topic>: <choice>`, so the **topic
-prefix is the dedup key.** Before inserting, `notion-search` the Decisions DB for the
-topic and check whether an `Active` row whose `Name` starts with the same `<topic>:`
-already exists. If it does and is unchanged, do **not** insert a duplicate. If this
-session **reverses or changes** it, set that old row's `Status` = `Superseded` with
-`notion-update-page` (do **not** overwrite it — the change of mind is itself memory
-worth recalling) and create the new decision alongside it.
+**Dedup & supersede (use the local index for completeness).** A decision's `Name` is
+`<topic>: <choice>`, so the **topic prefix is the dedup key.** The free plan cannot
+enumerate the Decisions DB (`query-data-sources` is paid), so `notion-search` alone misses
+rows that don't surface for your terms. **Consult the local index first** — it lists every
+decision's `{topic, status, id}` exhaustively:
 
-Decisions live **only in Notion** (the single source of truth). Do not write a local
-decision mirror — recall reads decisions live via `notion-search`, so there is no local
-copy to drift out of sync.
+```bash
+ROOT="$PWD"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
+bash "$IDX" find-topic "$ROOT" "<topic>"   # every existing row on this topic (any status)
+```
+
+- If an `Active` row with the same `<topic>` already exists and is **unchanged**, do **not**
+  insert a duplicate.
+- If this session **reverses or changes** it, set the old row's `Status` = `Superseded`
+  via `notion-update-page` (never overwrite — the change of mind is itself memory), create
+  the new decision alongside it, and **update the index for both** (below).
+- **Block granularity pollution at write time.** If the candidate is a display / naming /
+  wording tweak rather than an architecture / dependency / process choice, do **not** create
+  a Decisions row — keep it in the Session's Decisions table. This is the guard that keeps
+  rows like `Changed files: bulleted` out of the canonical DB.
+
+**Update the index after every Notion write** (this is what makes the next dedup complete):
+
+```bash
+# after creating a Decision (capture its page id from notion-create-pages):
+bash "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-MM-DD>" "<Name>" "<Project>"
+# after superseding an old one:
+bash "$IDX" upsert "$ROOT" decision "<old_page_id>" "<topic>" Superseded "<old_date>" "<old_Name>" "<Project>"
+```
+
+The index holds **keys only** (topic / status / id — no rationale or content); Notion stays
+the single source of truth for each decision's text. The index exists solely so dedup,
+supersede, and audit can see the **complete** set that free-plan search cannot enumerate.
 
 ## 7. Chat highlights — curated, anchored to real messages
 
-The full chat is **not** stored (too large to append through the MCP in one session).
-Build the `## Highlights` section instead, but **anchor it to the deterministic
+The full cleaned chat is **paged out to a child page** (step 5b), not re-dumped here.
+Build the `## Highlights` section as a curated subset, **anchored to the deterministic
 `prompts` output from step 3 — those are the human's actual words.**
 
 - **You callouts** — use the real messages from `prompts`, condensed but **never
@@ -230,15 +252,19 @@ this triage cannot drift.
   inject it offline (it lives at `<repo>/.iroha/state.md`, overwritten each save so it
   never drifts):
   `MD="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh" state-md-path "$PWD")"; mkdir -p "$(dirname "$MD")"; printf '%s' "<state body>" > "$MD"`.
-  **Remind the user to commit `.iroha/state.md`** so the memory reaches teammates. Notion
-  is the single source of truth for decisions/sessions (recall reads it via
-  `notion-search`); the repo only holds this State mirror for the offline hook.
+  **Remind the user to commit `.iroha/state.md` and `.iroha/index.ndjson`** so the memory
+  and the enumeration index reach teammates. Notion is the single source of truth for the
+  decision/session *content* (recall reads it via `notion-search`); the repo holds only the
+  State mirror (for the offline hook) and the keys-only index (for complete enumeration).
 
 ## 9. Mark saved + report
 
 ```bash
 SAVED="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.sh" saved-dir)"
 mkdir -p "$SAVED" && : > "$SAVED/${CLAUDE_SESSION_ID}"
+# index the Session row too, so audit/recall can enumerate sessions completely:
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" upsert "$PWD" session \
+  "<session_page_id>" "" "<Status>" "<YYYY-MM-DD>" "<Name>" "<Project>"
 ```
 
 Report the Session page URL, how many decisions were recorded, and that the Project
@@ -247,7 +273,7 @@ State was updated.
 ## Notes
 
 - Do not write secrets to Notion; if the transcript surfaced any, omit them.
-- Highlights come from your memory of the session, not a transcript dump; the full
-  chat is intentionally not stored (too large to append per session).
+- Highlights come from your memory of the session, not a transcript dump; the full cleaned
+  chat is paged out to a child page (step 5b), while the raw transcript is never stored.
 - If the stack changed materially this session (new lockfile / framework / CI), suggest
   the user run `/iroha:project` to refresh the project's architecture profile.
