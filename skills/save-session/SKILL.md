@@ -210,7 +210,9 @@ consolidation): the local BM25 search surfaces a decision that means the same th
 
 **Update the index after every Notion write** (this is what makes the next dedup complete
 AND what makes proactive recall work). The 9th arg is a **search snippet** — a one-line
-condensation of the decision's `Rationale` (≤160 chars, newlines collapsed to spaces):
+condensation of the decision's `Rationale` (≤160 chars, newlines collapsed to spaces; end on a
+**word / phrase boundary, never mid-token** so the trailing CJK bigram the BM25 stage keys on
+stays intact):
 
 ```bash
 # after creating a Decision (capture its page id from notion-create-pages):

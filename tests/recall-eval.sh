@@ -11,6 +11,19 @@
 #
 # It runs against <root>/.iroha/index.ndjson (default: this repo). Re-label the golden set when
 # the index changes materially. Run: bash tests/recall-eval.sh; echo $?   (0 = thresholds met)
+#
+# KNOWN LIMITATION (abstention is scoped, not absolute). The negatives here are CROSS-DOMAIN
+# (different language AND topic), which a pure-lexical pass abstains on cleanly (no shared CJK
+# bigram -> score 0). But an off-topic prompt that shares the corpus's *software* vocabulary
+# (e.g. "Postgresのインデックス設計を最適化" matches 設計/最適/インデ…) can clear the floor and
+# leak a hit — and neither a higher floor nor a coverage gate separates it from a real paraphrase
+# (their score/coverage distributions overlap; measured 2026-06-25). This is an inherent limit of
+# lexical recall on a small, single-domain corpus; the proper fix is a local SEMANTIC stage, which
+# is deliberately deferred (YAGNI). The harm is low: hook injections are labelled advisory
+# ("possibly relevant; verify"), so a leak is context noise, not a wrong action, and /iroha:recall
+# (semantic) + human judgement filter it. The floor is intentionally NOT raised — that would trade
+# away real recall (the north-star value) to suppress low-harm noise. So "abstention" below is
+# reported as CROSS-DOMAIN abstention; same-software-vocabulary precision is a known soft spot.
 set -u
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -32,9 +45,13 @@ compactした後に会話を復元したい|38a822c6-938a-8159-8bca-c1edc602bb62
 会話ログの全文はどこに保存する|38a822c6-938a-8175-8a6d-ece0145279ad
 メモリの全件列挙はどうやる|38a822c6-938a-8167-98c2-fd940cb1dd06
 StateをローカルにミラーするのはなぜJIT|389822c6-938a-81ef-829e-c0f6b1bc2b91
+Notionに書く前にStateの破損を防ぎたい|38a822c6-938a-8155-a95f-fd6cf2fe351d
+ミラーとNotionのStateがズレないようにしたい|38a822c6-938a-8143-a364-f3ee8152e4a7
+セッション終了時に自動でNotionへ保存すべきか|38a822c6-938a-811e-b923-eba8f03e1866
 configure nginx reverse proxy with tls termination|NONE
 optimize the react component re-rendering performance|NONE
 terraform provider configuration for gcp networking|NONE
+おすすめの映画を教えてほしい|NONE
 EOF
 
 pos_total=0; pos_hit=0; mrr_sum=0
@@ -67,7 +84,7 @@ recall_pct=$(awk -v h="$pos_hit" -v t="$pos_total" 'BEGIN{printf "%d", (t? 100*h
 abstain_pct=$(awk -v h="$abs_ok" -v t="$abs_total" 'BEGIN{printf "%d", (t? 100*h/t : 100)}')
 mrr=$(awk -v s="$mrr_sum" -v t="$pos_total" 'BEGIN{printf "%.3f", (t? s/t : 0)}')
 echo "---"
-echo "Recall@$K = $pos_hit/$pos_total ($recall_pct%) · MRR = $mrr · Abstention = $abs_ok/$abs_total ($abstain_pct%)"
+echo "Recall@$K = $pos_hit/$pos_total ($recall_pct%) · MRR = $mrr · Abstention (cross-domain) = $abs_ok/$abs_total ($abstain_pct%)"
 fail=0
 [ "$recall_pct" -lt "$RECALL_THRESHOLD" ] && { echo "FAIL: Recall@$K below ${RECALL_THRESHOLD}%"; fail=1; }
 [ "$abstain_pct" -lt "$ABSTAIN_THRESHOLD" ] && { echo "FAIL: abstention below ${ABSTAIN_THRESHOLD}%"; fail=1; }

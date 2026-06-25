@@ -36,8 +36,12 @@ All notable changes to iroha are documented here. The format loosely follows
 - **Recall quality eval harness** (`tests/recall-eval.sh`, `npm run test:recall`, in CI): a
   golden set of realistic prompts → expected decision, scoring **Recall@k / MRR / abstention**
   on the real index — so "does the memory get more useful as it grows?" is a measured curve and
-  recall regressions are caught (at the time of writing Recall@3 = 100%, MRR = 0.854,
-  abstention = 100% — a snapshot of the live `recall-eval` value, not a fixed guarantee).
+  recall regressions are caught (at the time of writing Recall@3 = 100% and cross-domain
+  abstention = 100%; the live MRR is reported by `recall-eval` and is **not pinned here** — it
+  shifts with the golden set, which is how a stale `MRR = 0.94` once rotted in this file).
+  Abstention is **scoped to cross-domain negatives**: an off-topic prompt that shares the
+  corpus's software vocabulary can still leak an *advisory* hit — an inherent limit of lexical
+  recall on a small single-domain corpus, whose proper fix (a local semantic stage) is deferred.
 - **Write-time dedup guard** in `save-session`: consults the index before creating a Decision,
   blocks granularity pollution at the source, and supersedes/merges near-dups — now also via a
   local BM25 near-duplicate check that catches an equivalent decision under a *different* topic

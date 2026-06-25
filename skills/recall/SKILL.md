@@ -115,6 +115,14 @@ these terms* — retry with different terms before concluding it is absent.
   second stage**: the user or Claude escalates to `/iroha:recall` when that cheap pointer is
   not enough, and here we add Notion **semantic** search (catches paraphrase the local
   lexical pass misses) plus full `Rationale` / `Alternatives` / changed-files synthesis.
+- **The local lexical stage trades precision for zero cost.** Being pure BM25 over a small,
+  single-domain index, an off-topic prompt that merely shares the project's *software*
+  vocabulary can surface an irrelevant decision — and neither a higher floor nor a coverage gate
+  cleanly separates that from a real paraphrase (measured). So the hook's injected pointers are
+  **advisory** ("possibly relevant; verify"): if a surfaced decision does not actually bear on
+  the request, treat it as noise and ignore it — never force it into the answer. This semantic
+  stage is the precision filter; a *local* semantic pass is a deferred upgrade (YAGNI at this
+  scale), not a shipped feature.
 - Recall reads decision/session *content* live from Notion (the single source of truth),
   so it is always current. The repo's `.iroha/index.ndjson` is **not** a content mirror —
   it holds keys + a short derived search snippet (id / topic / status / date / title / a
