@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "記憶の健全性チェック", "メモリを監査", "audit the memory".
+description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "記憶の健全性チェック", "メモリを監査", "audit the memory". Not for saving a session (use /iroha:save-session) or recalling a past decision (use /iroha:recall).
 argument-hint: "[--fix]"
 ---
 

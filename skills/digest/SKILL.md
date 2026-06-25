@@ -1,6 +1,6 @@
 ---
 name: digest
-description: Roll up a period of iroha memory (this week / month / an explicit date range) into one digest — the decisions made, the sessions and what they shipped, aggregate metrics, and what is still open — so a team gets a scannable "what happened lately" without opening every session. Produces a visual Digest page in Notion and reports its URL. Triggers on "/iroha:digest", "週次まとめ", "この期間の振り返り", "summarize the last week / month".
+description: Roll up a period of iroha memory (this week / month / an explicit date range) into one digest — the decisions made, the sessions and what they shipped, aggregate metrics, and what is still open — so a team gets a scannable "what happened lately" without opening every session. Produces a visual Digest page in Notion and reports its URL. Triggers on "/iroha:digest", "週次まとめ", "この期間の振り返り", "summarize the last week / month". Not for saving one session (use /iroha:save-session) or looking up a single past decision (use /iroha:recall).
 argument-hint: "[week|month|YYYY-MM-DD..YYYY-MM-DD]"
 ---
 

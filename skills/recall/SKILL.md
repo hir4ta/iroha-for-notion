@@ -1,7 +1,7 @@
 ---
 name: recall
 description: Search this project's iroha memory — past decisions ("did we decide against X? why?") and similar past work ("have we built something like this before?"). Uses Notion semantic search (works on the free plan) over the Sessions and Decisions databases. Triggers on "/iroha:recall", and naturally when the user asks "過去に〜決めた?", "なぜ〜にした?", "似た実装ある?", "did we / why / have we done this before".
-argument-hint: "<query>"
+argument-hint: "[query]"
 ---
 
 # iroha: recall
