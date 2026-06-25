@@ -21,6 +21,8 @@ state_md="$(iroha_state_md_path "$cwd")"
 if [ -s "$state_md" ]; then
   ctx="iroha — このプロジェクトの前回状態:
 $(cat "$state_md")
+
+（実装前に「過去に似た実装・決定は?」を /iroha:recall <トピック> で確認できます）
 "
 fi
 

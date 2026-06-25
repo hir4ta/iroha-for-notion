@@ -56,25 +56,18 @@ iroha_config_set_state_page() {
   jq --arg p "$1" --arg id "$2" '.state_pages[$p] = $id' "$f" >"$tmp" && mv "$tmp" "$f"
 }
 
-# iroha_state_md_path <cwd>  -> local mirror of the project's State markdown
-# (read by the SessionStart hook, which cannot reach Notion).
-iroha_state_md_path() {
-  local base key
-  base="$(dirname "$(iroha_config_path)")"
-  key="$(printf '%s' "$1" | sed 's#/#-#g')"
-  printf '%s/state/%s.md' "$base" "$key"
-}
+# iroha_state_md_path <project-root>  -> the project's State mirror, kept IN THE REPO
+# (<root>/.iroha/state.md). Committed so a teammate who pulls it gets the latest State
+# injected by their SessionStart hook, which cannot reach Notion. Commit this file.
+iroha_state_md_path() { printf '%s/.iroha/state.md' "$1"; }
 
-# iroha_saved_dir  -> directory of per-session "saved" markers.
+# iroha_saved_dir  -> directory of per-session "saved" markers (per-machine, in $HOME).
 iroha_saved_dir() { printf '%s/saved' "$(dirname "$(iroha_config_path)")"; }
 
-# iroha_decisions_md_path <cwd>  -> local append-log of decisions (free, offline recall).
-iroha_decisions_md_path() {
-  local base key
-  base="$(dirname "$(iroha_config_path)")"
-  key="$(printf '%s' "$1" | sed 's#/#-#g')"
-  printf '%s/decisions/%s.md' "$base" "$key"
-}
+# iroha_decisions_md_path <project-root>  -> the project's decision log, kept IN THE REPO
+# (<root>/.iroha/decisions.md). Committed so the whole team has an offline recall grep
+# fallback (Notion search is the primary recall). Commit this file.
+iroha_decisions_md_path() { printf '%s/.iroha/decisions.md' "$1"; }
 
 # CLI: usable from skills as `bash config.sh <cmd> ...`. Guarded so sourcing is a no-op.
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then

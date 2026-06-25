@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# iroha-for-notion — local, offline recall. Greps the project's locally mirrored
-# decisions for a query and prints matching decision blocks. Free: needs no Notion
-# access (the Notion MCP query/search tools require a paid Business plan + AI).
+# iroha-for-notion — OFFLINE recall fallback. Greps the project's repo-committed
+# decision mirror (.iroha/decisions.md) and prints matching decision blocks. Primary
+# recall is notion-search (works on the free plan); this runs when Notion is offline.
 # Usage: recall.sh <project-cwd> <query>
 set -u
 
@@ -17,7 +17,7 @@ fi
 
 dec="$(iroha_decisions_md_path "$cwd")"
 if [ ! -f "$dec" ]; then
-  echo "（このプロジェクトのローカル決定ログはまだありません。/iroha-for-notion:save-session で蓄積されます）"
+  echo "（このプロジェクトのローカル決定ログはまだありません。/iroha:save-session で蓄積されます）"
   exit 0
 fi
 

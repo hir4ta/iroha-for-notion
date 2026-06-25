@@ -94,11 +94,11 @@ rm -rf "$IROHA_CONFIG_DIR"
 echo "=== session-start hook (state injection + save reminder) ==="
 HOOKHOME=$(mktemp -d "${TMPDIR:-/tmp}/iroha-home.XXXXXX")
 HOOKDATA=$(mktemp -d "${TMPDIR:-/tmp}/iroha-data.XXXXXX")
-PROJ="/tmp/iroha-proj"
-HASH="-tmp-iroha-proj"
-mkdir -p "$HOOKHOME/.claude/projects/$HASH" "$HOOKDATA/state"
+PROJ=$(mktemp -d "${TMPDIR:-/tmp}/iroha-proj.XXXXXX")   # repo root; State mirror at $PROJ/.iroha/state.md
+HASH=$(printf '%s' "$PROJ" | sed 's#/#-#g')
+mkdir -p "$HOOKHOME/.claude/projects/$HASH" "$PROJ/.iroha"
 : >"$HOOKHOME/.claude/projects/$HASH/old.jsonl"
-printf 'STATE-CONTENT-XYZ' >"$HOOKDATA/state/${HASH}.md"
+printf 'STATE-CONTENT-XYZ' >"$PROJ/.iroha/state.md"
 run_hook() {
   printf '{"cwd":"%s","session_id":"cur"}' "$PROJ" |
     CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$HOOKDATA" HOME="$HOOKHOME" \
@@ -110,21 +110,21 @@ has hook-reminds-unsaved "未保存" "$out"
 has hook-json-shape "hookSpecificOutput" "$out"
 mkdir -p "$HOOKDATA/saved" && : >"$HOOKDATA/saved/old"
 hasnt hook-no-remind-when-saved "未保存" "$(run_hook)"
-rm -f "$HOOKDATA/state/${HASH}.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl"
+rm -f "$PROJ/.iroha/state.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl"
 eq hook-silent-when-empty "" "$(run_hook)"
-rm -rf "$HOOKHOME" "$HOOKDATA"
+rm -rf "$HOOKHOME" "$HOOKDATA" "$PROJ"
 
 echo "=== recall (local, offline decision search) ==="
-RECDIR=$(mktemp -d "${TMPDIR:-/tmp}/iroha-rec.XXXXXX")
-DEC="$RECDIR/decisions/-tmp-recproj.md"
+RECPROJ=$(mktemp -d "${TMPDIR:-/tmp}/iroha-rec.XXXXXX")
+DEC="$RECPROJ/.iroha/decisions.md"
 mkdir -p "$(dirname "$DEC")"
 printf '## Prisma を採用\n- Why: 型安全\n- Rejected: Drizzle\n\n## relation は使わない\n- Why: MCP バグ\n- Rejected: native relation\n' >"$DEC"
-recall_out=$(IROHA_CONFIG_DIR="$RECDIR" CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "/tmp/recproj" "drizzle")
+recall_out=$(CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "$RECPROJ" "drizzle")
 has recall-hit "Prisma を採用" "$recall_out"
 hasnt recall-miss "relation は使わない" "$recall_out"
-miss_out=$(IROHA_CONFIG_DIR="$RECDIR" CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "/tmp/recproj" "kubernetes")
+miss_out=$(CLAUDE_PLUGIN_ROOT="$HERE/.." bash "$HERE/../scripts/recall.sh" "$RECPROJ" "kubernetes")
 hasnt recall-empty "Prisma" "$miss_out"
-rm -rf "$RECDIR"
+rm -rf "$RECPROJ"
 
 echo "=== result: $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ]
