@@ -87,6 +87,19 @@ iroha_integrity() {
     fi
   fi
 
+  # 5. Supersede lineage — every decision's `supersedes` must point to an id that exists in the
+  #    index. A dangling predecessor breaks the /iroha:history chain walk (and signals a bad save).
+  local supref allids danglingsup
+  supref=$(jq -r 'select(.type=="decision" and (.supersedes // "")!="") | .supersedes' "$idx" 2>/dev/null | sort -u)
+  if [ -n "$supref" ]; then
+    allids=$(jq -r '.id // empty' "$idx" 2>/dev/null | sort -u)
+    danglingsup=$(comm -23 <(printf '%s\n' "$supref") <(printf '%s\n' "$allids"))
+    if [ -n "$danglingsup" ]; then
+      echo "integrity: decision 'supersedes' points to an id missing from the index (broken lineage): $(printf '%s' "$danglingsup" | tr '\n' ' ')"
+      issues=1
+    fi
+  fi
+
   [ "$issues" -eq 0 ]
 }
 

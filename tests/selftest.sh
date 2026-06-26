@@ -222,6 +222,15 @@ eq index-find-topic-miss "" "$(iroha_index_find_topic "$IDXROOT" "missing-topic"
 eq index-list-decisions "2" "$(iroha_index_list "$IDXROOT" decision | grep -c '"type":"decision"')"
 eq index-list-sessions "1" "$(iroha_index_list "$IDXROOT" session | grep -c '"type":"session"')"
 eq index-valid-ndjson "ok" "$(iroha_index_list "$IDXROOT" | jq -e . >/dev/null 2>&1 && echo ok || echo bad)"
+# supersede LINEAGE: the 10th upsert arg records the predecessor id; index.sh chain walks the chain
+# newest->oldest. This is the offline primitive /iroha:history follows to show "v3 <- v2 <- v1".
+iroha_index_upsert "$IDXROOT" decision chA "topicX" Superseded 2026-06-24 "topicX: v1" demo "first" ""
+iroha_index_upsert "$IDXROOT" decision chB "topicX" Superseded 2026-06-25 "topicX: v2" demo "second" "chA"
+iroha_index_upsert "$IDXROOT" decision chC "topicX" Active 2026-06-26 "topicX: v3" demo "third" "chB"
+eq index-supersedes-stored "chB" "$(iroha_index_find_topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chC")|.supersedes')"
+eq index-chain-walk "chC,chB,chA" "$(iroha_index_chain "$IDXROOT" chC | jq -r '.id' | paste -sd',' -)"
+eq index-chain-single "chA" "$(iroha_index_chain "$IDXROOT" chA | jq -r '.id' | paste -sd',' -)"
+eq index-original-no-supersedes "null" "$(iroha_index_find_topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chA")|.supersedes // "null"')"
 rm -rf "$IDXROOT"
 
 echo "=== search (local BM25 recall: CJK bigram, text field, status weight, abstention) ==="
@@ -424,6 +433,17 @@ has integrity-dup-active-msg "duplicate Active" "$(iroha_integrity "$INTROOT" 2>
   printf '%s\n' '{"type":"session","id":"38a822c6-938a-811e-b58a-d62cc504920a","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — x"}'
 } >"$INTROOT/.iroha/index.ndjson"
 eq integrity-superseded-ok "0" "$(iroha_integrity "$INTROOT" >/dev/null 2>&1; echo $?)"
+# valid supersede lineage: the Active row's `supersedes` points to a predecessor that exists -> clean.
+{
+  printf '%s\n' '{"type":"decision","id":"d0","topic":"連結","status":"Superseded","date":"2026-06-20","title":"連結: 旧"}'
+  printf '%s\n' '{"type":"decision","id":"d1","topic":"連結","status":"Active","date":"2026-06-24","title":"連結: URL","supersedes":"d0"}'
+  printf '%s\n' '{"type":"session","id":"38a822c6-938a-811e-b58a-d62cc504920a","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — x"}'
+} >"$INTROOT/.iroha/index.ndjson"
+eq integrity-lineage-ok "0" "$(iroha_integrity "$INTROOT" >/dev/null 2>&1; echo $?)"
+# dangling supersedes: points to an id missing from the index -> flagged (broken /iroha:history chain).
+printf '%s\n' '{"type":"decision","id":"d9","topic":"x","status":"Active","date":"2026-06-25","title":"x","supersedes":"ghost"}' \
+  >>"$INTROOT/.iroha/index.ndjson"
+has integrity-dangling-supersedes "broken lineage" "$(iroha_integrity "$INTROOT" 2>&1)"
 # duplicate id (upsert failed to replace) -> flagged.
 printf '%s\n' '{"type":"decision","id":"d1","topic":"other","status":"Active","date":"2026-06-25","title":"other"}' \
   >>"$INTROOT/.iroha/index.ndjson"

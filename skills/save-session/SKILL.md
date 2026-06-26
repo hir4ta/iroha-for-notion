@@ -184,7 +184,9 @@ For each decision, `notion-create-pages` under `decisions_ds_id`. `Name` = a sho
 `Link: URL not relation`. Keep the *why* in `Rationale` and the rejected options in
 `Alternatives`, never in the Name. Also set `Project`, `Status` = `Active`, `Tags` (JSON
 array string from architecture / dependency / process), `Session` = the Session page URL
-from step 5, `"date:Date:start"`.
+from step 5, `"date:Date:start"`. When this decision **replaces** an earlier one (see
+supersede, below), also set `Supersedes` = the **Notion URL of the decision it replaced**
+(`https://www.notion.so/<bare-old-id>`) — the lineage link `/iroha:history` walks.
 
 **Dedup & supersede (use the local index for completeness).** A decision's `Name` is
 `<topic>: <choice>`, so the **topic prefix is the dedup key.** The free plan cannot
@@ -207,7 +209,8 @@ consolidation): the local BM25 search surfaces a decision that means the same th
   insert a duplicate.
 - If this session **reverses or changes** it, set the old row's `Status` = `Superseded`
   via `notion-update-page` (never overwrite — the change of mind is itself memory), create
-  the new decision alongside it, and **update the index for both** (below).
+  the new decision alongside it **with `Supersedes` = the old row's Notion URL** (this is the
+  lineage edge `/iroha:history` follows), and **update the index for both** (below).
 - **Block granularity pollution at write time.** If the candidate is a display / naming /
   wording tweak rather than an architecture / dependency / process choice, do **not** create
   a Decisions row — keep it in the Session's Decisions table. This is the guard that keeps
@@ -220,8 +223,9 @@ condensation of the decision's `Rationale` (≤160 chars, newlines collapsed to 
 stays intact):
 
 ```bash
-# after creating a Decision (capture its page id from notion-create-pages):
-bash "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-MM-DD>" "<Name>" "<Project>" "<rationale snippet ≤160 chars>"
+# after creating a Decision (capture its page id from notion-create-pages). The 10th arg is the
+# bare id of the decision this one SUPERSEDES (empty for an original) — the lineage /iroha:history walks:
+bash "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-MM-DD>" "<Name>" "<Project>" "<rationale snippet ≤160 chars>" "<old_page_id-if-superseding-else-empty>"
 # after superseding an old one (keep its snippet so it stays searchable as history):
 bash "$IDX" upsert "$ROOT" decision "<old_page_id>" "<topic>" Superseded "<old_date>" "<old_Name>" "<Project>" "<old rationale snippet>"
 ```

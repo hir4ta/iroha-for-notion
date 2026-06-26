@@ -103,6 +103,7 @@ In Claude Code:
 | `/iroha:init` | One-time setup (idempotent): create or join the Notion databases + views. |
 | `/iroha:save-session` | Save this session: summary, decisions, rules changed, work-state, highlights, changed files. |
 | `/iroha:recall <query>` | Semantic search over Sessions + Decisions for past decisions and similar prior work. |
+| `/iroha:history <topic>` | Walk a decision's supersede lineage — how and why the choice evolved (`v3 ← v2 ← v1`), with the reason at each step. Read-only. |
 | `/iroha:project` | Capture/update this project's architecture profile (manual). |
 | `/iroha:digest [week\|month\|range]` | Roll a period up into one digest: decisions, sessions, aggregate metrics, what's still open, and a timeline. |
 | `/iroha:audit [--fix]` | Health-check the memory (duplicate decisions, State drift, stale items); optionally apply safe, reversible fixes. |

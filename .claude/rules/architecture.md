@@ -54,7 +54,12 @@
   config.json / saved マーカーは $HOME (マシン固有)。State の未完了は save 毎にトリアージ。
 - **命名と履歴**: Session = `YYYY-MM-DD — 主題`、Decision = `トピック: 選択` (理由は Rationale、
   却下案は Alternatives 欄)。決定を覆す時は旧行を **Status=Superseded** にし上書きしない (心変わりも
-  記憶)。Session ページのセクション構造は固定 (Metrics ダッシュボードは常設、任意は
+  記憶)。**supersede は lineage edge を張る**: 新決定の `Supersedes` プロパティ=置換した旧決定の
+  **URL**(relation 回避＝Session↔Decision と同じ URL 連結)、index は同じ辺を `supersedes`(旧 id)で
+  ミラーする。`/iroha:history <topic>` が現行 Active から `index.sh chain` で「v3←v2←v1」を offline に
+  辿り、各段の理由を notion-fetch で合成して**決定の進化を物語として**見せる。`supersedes` の指す id が
+  index に無い時は `integrity.sh` が **broken lineage** として緑のまま通さない。Session ページのセクション
+  構造は固定 (Metrics ダッシュボードは常設、任意は
   Architecture / Rules changed / Failures の 3 つ)。
 - **冪等性**: `/init` は既存コンテナ/DB を検出したら再利用 (チーム参加 = 同じコマンド)。
   fallback = 複製可能 Notion テンプレート方式。
@@ -71,7 +76,9 @@
   `source=compact`（`/compact`・auto-compact 後）は現在セッションのトランスクリプトから会話
   (prompts ＋ chat 直近) を再注入してスレッドを復元する（行単位 cap でマルチバイト非分割。Notion
   非到達の不変は維持＝ローカル transcript のみ読む）。
-- **派生スキルは正本を汚さない**。`/iroha:digest` (期間ロールアップ) と `/iroha:audit`
-  (記憶の健全性監査=重複決定/State ドリフト/陳腐化の検出) は `notion-search` で読むだけ。
+- **派生スキルは正本を汚さない**。`/iroha:digest` (期間ロールアップ)・`/iroha:audit`
+  (記憶の健全性監査=重複決定/State ドリフト/陳腐化/broken lineage の検出)・`/iroha:history`
+  (決定の supersede 連鎖を辿る) は読むだけ (`notion-search`/`notion-fetch`/index)。
   digest は container 配下に使い捨ての Digest ページを 1 枚書く (専用 DB は作らない)。audit の
-  修正系は `--fix`/確認時のみ、削除でなく `Status=Superseded` 等の **可逆操作**に限る。
+  修正系は `--fix`/確認時のみ、削除でなく `Status=Superseded`/欠落 `Supersedes` 補完 等の
+  **可逆操作**に限る。

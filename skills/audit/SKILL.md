@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "audit the memory", "check memory health". Not for saving a session (use /iroha:save-session) or recalling a past decision (use /iroha:recall).
+description: Health-check this project's iroha memory and report (then optionally fix) the things that rot a living memory — duplicate or conflicting Active decisions, decisions that should be Superseded, broken/missing supersede lineage, State drift (stale summary / stale unfinished items carried many sessions), orphaned decisions whose Session link is broken, and Sessions missing the fixed structure. Triggers on "/iroha:audit", "audit the memory", "check memory health". Not for saving a session (use /iroha:save-session) or recalling a past decision (use /iroha:recall).
 argument-hint: "[--fix]"
 ---
 
@@ -44,6 +44,13 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
   reversed. Flag the older one. (high)
 - **C. Orphaned decisions** — a decision whose `Session` URL is empty or does not resolve
   (`notion-fetch` 404). The "why" loses its anchor. (medium)
+- **C2. Broken / missing lineage** — `bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/integrity.sh" "$PWD"`
+  flags a `supersedes` that points to an id missing from the index (**broken lineage**, the
+  `/iroha:history` chain dead-ends). Also flag the inverse: a `Superseded` decision that **no**
+  Active decision links back to via `Supersedes` (a dangling successor — the chain has a hole).
+  Fix is reversible: set the missing `Supersedes` URL on the superseding decision (+ the index
+  `supersedes` id) **only when the predecessor is unambiguous** (the newer Rationale names it, or a
+  `→ …に置換` note); never guess a predecessor. (medium)
 - **D. State drift** — first run the **deterministic** lint on the local mirror (byte-identical
   to the Notion page under save-session's single-source rule), then `notion-fetch` the page for
   the judgement checks below:
