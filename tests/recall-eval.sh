@@ -35,7 +35,11 @@ ABSTAIN_THRESHOLD=100                 # require 100% honest abstention (a false 
 
 # Golden set. One case per line: "<query>|<expected-page-id>"; expected id "NONE" = must abstain.
 # Queries are paraphrases a developer would actually type (NOT the decision's own words), so this
-# measures real recall, not echo. IDs are this repo's real Decision/Session pages.
+# measures real recall, not echo. IDs are this repo's real Decision/Session pages. The last four
+# positives are SESSION-seeking ("have we done X before?") so this set measures SESSION recall too,
+# not just decisions — closing the blind spot that the set was previously all-decision (a measured
+# re-check found session recall actually healthy: distinctive-work queries rank 1-2; these lock it
+# against regression).
 read -r -d '' GOLDEN <<'EOF'
 Notionの認証はAPIトークンが必要か|389822c6-938a-8137-824d-e4883efdbcf5
 SessionとDecisionの連結にrelationを使うべきか|389822c6-938a-812a-86fc-f709b3428ec2
@@ -48,6 +52,10 @@ StateをローカルにミラーするのはなぜJIT|389822c6-938a-81ef-829e-c0
 Notionに書く前にStateの破損を防ぎたい|38a822c6-938a-8155-a95f-fd6cf2fe351d
 ミラーとNotionのStateがズレないようにしたい|38a822c6-938a-8143-a364-f3ee8152e4a7
 セッション終了時に自動でNotionへ保存すべきか|38a822c6-938a-811e-b923-eba8f03e1866
+リコールを毎プロンプトのheadlessからローカル検索に作り替えた回|38a822c6-938a-8160-92e3-fb101f391cdb
+Stateの破損を根治して数百件規模でスケール検証した回|38a822c6-938a-8189-b9e6-f5c84d304efa
+未保存セッションを知らせる保存バックログを実装した回|38a822c6-938a-811e-b58a-d62cc504920a
+cross-encoderのrerankで誤注入を消した回|38b822c6-938a-8186-9424-e9ceb358df3d
 configure nginx reverse proxy with tls termination|NONE
 optimize the react component re-rendering performance|NONE
 terraform provider configuration for gcp networking|NONE
