@@ -106,6 +106,11 @@ All notable changes to iroha are documented here. The format loosely follows
 
 ### Fixed
 
+- **`save-session` transcript locate no longer globs (or hangs).** Step 2 derived the session
+  transcript with `ls -t "$HOME/.claude/projects/"*"/<sid>.jsonl"` — a glob over *every* project
+  dir that was observed to return empty and then hang for ~2 min. Replaced by a deterministic
+  `config.sh transcript-path <root> <sid>` helper (cwd→project-dir hash, instant, no glob) with a
+  bounded `find` fallback only if the project root moved since launch; guarded by selftest.
 - A Session's `Full chat` toggle could hold a fabricated placeholder ("…full chat
   continues…") instead of the real chat; now structurally prevented, and the one affected
   page was repaired with its real 103-turn chat.

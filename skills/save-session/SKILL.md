@@ -31,9 +31,14 @@ confirm. (Duplicate decisions are the one defect that rots the "living memory".)
 
 ## 2. Locate this session's transcript
 
+Resolve it **deterministically** from the cwd — do **not** glob. (The old
+`ls -t "$HOME/.claude/projects/"*"/<sid>.jsonl"` pattern globbed over every project dir and was
+observed to return empty and then hang for ~2 min; `transcript-path` derives the exact path and
+only falls back to a bounded `find` if the project root moved since launch.)
+
 ```bash
-TX=$(ls -t "$HOME/.claude/projects/"*"/${CLAUDE_SESSION_ID}.jsonl" 2>/dev/null | head -1)
-echo "$TX"
+TX=$(bash "$L" transcript-path "$PWD" "$CLAUDE_SESSION_ID")
+echo "$TX"   # empty -> transcript not found; tell the user and stop
 ```
 
 ## 3. Deterministic extraction

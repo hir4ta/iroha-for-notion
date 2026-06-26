@@ -72,11 +72,26 @@ iroha_state_md_path() { printf '%s/.iroha/state.md' "$1"; }
 # iroha_saved_dir  -> directory of per-session "saved" markers (per-machine, in $HOME).
 iroha_saved_dir() { printf '%s/saved' "$(dirname "$(iroha_config_path)")"; }
 
+# iroha_transcript_path <project-root> <session-id>  -> this session's transcript JSONL, or empty.
+# Claude Code stores it at $HOME/.claude/projects/<root-with-each-/-as-->/<session-id>.jsonl.
+# Resolve that path DETERMINISTICALLY (no glob); only if the project root moved since launch do we
+# fall back to a BOUNDED find by session id. (save-session used to locate it with
+# `ls -t "$HOME/.claude/projects/"*"/<sid>.jsonl"` — a glob over every project dir that was observed
+# to return empty and then hang for ~2 min; the deterministic path is instant and never globs.)
+iroha_transcript_path() {
+  local root="$1" sid="$2" projdir p
+  projdir="$HOME/.claude/projects/$(printf '%s' "$root" | sed 's#/#-#g')"
+  p="$projdir/$sid.jsonl"
+  if [ -f "$p" ]; then printf '%s' "$p"; return 0; fi
+  find "$HOME/.claude/projects" -maxdepth 2 -name "$sid.jsonl" -print 2>/dev/null | head -1
+}
+
 # CLI: usable from skills as `bash config.sh <cmd> ...`. Guarded so sourcing is a no-op.
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
   case "${1:-}" in
     state-md-path) iroha_state_md_path "${2:-}" ;;
     saved-dir) iroha_saved_dir ;;
+    transcript-path) iroha_transcript_path "${2:-}" "${3:-}" ;;
     get) iroha_config_get "${2:-}" ;;
     set) iroha_config_set "${2:-}" "${3:-}" ;;
     get-state) iroha_config_get_state_page "${2:-}" ;;

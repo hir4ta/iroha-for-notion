@@ -119,6 +119,21 @@ iroha_config_set session_db_id "DB2"
 eq config-self-heal-set "DB2" "$(iroha_config_get session_db_id)"
 rm -rf "$IROHA_CONFIG_DIR"
 
+echo "=== transcript-path (deterministic locate; bounded find fallback; never globs) ==="
+TPHOME=$(mktemp -d "${TMPDIR:-/tmp}/iroha-tp.XXXXXX")
+TPROOT="/Users/demo/Projects/app"
+TPHASH=$(printf '%s' "$TPROOT" | sed 's#/#-#g')   # cwd -> project dir name (each "/" -> "-")
+mkdir -p "$TPHOME/.claude/projects/$TPHASH" "$TPHOME/.claude/projects/-other-proj"
+: >"$TPHOME/.claude/projects/$TPHASH/sidA.jsonl"
+: >"$TPHOME/.claude/projects/-other-proj/sidB.jsonl"
+# deterministic hit: the path is derived from the cwd hash, with no glob over every project dir.
+eq tp-deterministic "$TPHOME/.claude/projects/$TPHASH/sidA.jsonl" "$(HOME="$TPHOME" iroha_transcript_path "$TPROOT" sidA)"
+# fallback: the cwd hash misses (project root moved since launch) -> a bounded find locates it by id.
+eq tp-find-fallback "$TPHOME/.claude/projects/-other-proj/sidB.jsonl" "$(HOME="$TPHOME" iroha_transcript_path "/moved/since/launch" sidB)"
+# miss: an unknown session id returns empty (the caller stops and tells the user, never guesses).
+eq tp-miss "" "$(HOME="$TPHOME" iroha_transcript_path "$TPROOT" nosuchsid)"
+rm -rf "$TPHOME"
+
 echo "=== session-start hook (state injection + save reminder) ==="
 HOOKHOME=$(mktemp -d "${TMPDIR:-/tmp}/iroha-home.XXXXXX")
 HOOKDATA=$(mktemp -d "${TMPDIR:-/tmp}/iroha-data.XXXXXX")
