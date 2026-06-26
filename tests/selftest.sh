@@ -286,6 +286,33 @@ has ri-selfcheck-config "config initialized" "$sc"
 sc2=$(env -u CLAUDE_PLUGIN_ROOT IROHA_CONFIG_DIR="$RIDATA" \
   bash "$HERE/../hooks/recall-inject.sh" --selfcheck)
 has ri-selfcheck-derives-root "READY" "$sc2"
+
+# rerank gate (OPT-IN cross-encoder precision filter) — armed via rerank_enabled. The contract
+# paths (empty/bad input, missing model) and the graceful fallback are deterministic WITHOUT the
+# ~570MB model: rerank.mjs exits 3 when the runtime/model is absent, and the hook must then degrade
+# to the pure-bash BM25 advisory result (no regression). The precision win itself is measured in
+# tests/rerank-eval.sh, which runs only where the model is installed.
+echo "=== rerank gate (opt-in precision filter: contract + graceful fallback to BM25) ==="
+IROHA_CONFIG_DIR="$RIDATA" bash "$HERE/../scripts/_lib/config.sh" set rerank_enabled true >/dev/null
+RERANK="$HERE/../scripts/rerank.mjs"
+if command -v node >/dev/null 2>&1; then
+  # contract: empty docs -> abstain ([], exit 0) BEFORE any model load.
+  eq rerank-empty-docs-abstain "[]" "$(printf '{"query":"x","docs":[]}' | node "$RERANK" 2>/dev/null)"
+  # contract: malformed stdin -> exit 2.
+  printf 'not-json' | node "$RERANK" >/dev/null 2>&1
+  eq rerank-bad-json-exit2 "2" "$?"
+  # contract: valid input but no model/runtime -> exit 3 (the caller's fallback signal).
+  printf '{"query":"x","docs":[{"id":"a","text":"b"}]}' | IROHA_MODEL_DIR="$(mktemp -d)" node "$RERANK" >/dev/null 2>&1
+  eq rerank-no-model-exit3 "3" "$?"
+  # hook fallback: rerank armed but model absent -> MUST still inject the BM25 advisory hit.
+  RREMPTY=$(mktemp -d)
+  has rerank-armed-falls-back-to-bm25 "連結: relation でなく URL" \
+    "$(ri "relationプロパティで連結すべきか検討したい" sidRR1 IROHA_MODEL_DIR="$RREMPTY")"
+  rm -rf "$RREMPTY"
+else
+  echo "  SKIP  rerank gate (node not available)"
+fi
+
 rm -rf "$RIDATA" "$RIDATA2" "$RIDATA3" "$RIPROJ" "$RICACHE"
 
 echo "=== state-lint (State body validator: escapes, missing sections, summary, real mirror) ==="
@@ -310,6 +337,54 @@ eq state-lint-empty-fail "1" "$(iroha_state_lint "$SLDIR/empty.md" >/dev/null 2>
 # if a corrupt State is ever committed (the recurring rot class, now caught at green/push time).
 eq state-lint-real-mirror "0" "$(iroha_state_lint "$HERE/../.iroha/state.md" >/dev/null 2>&1; echo $?)"
 rm -rf "$SLDIR"
+
+echo "=== integrity (deterministic substrate self-monitoring: malformed/dup-id/dup-active/State-link) ==="
+# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
+. "$HERE/../scripts/_lib/integrity.sh"
+INTROOT=$(mktemp -d "${TMPDIR:-/tmp}/iroha-int.XXXXXX")
+mkdir -p "$INTROOT/.iroha"
+# clean baseline: two distinct-topic Active decisions + a session State links to -> clean (exit 0).
+{
+  printf '%s\n' '{"type":"decision","id":"d1","topic":"連結","status":"Active","date":"2026-06-24","title":"連結: URL"}'
+  printf '%s\n' '{"type":"decision","id":"d2","topic":"runtime","status":"Active","date":"2026-06-24","title":"runtime: bash"}'
+  printf '%s\n' '{"type":"session","id":"38a822c6-938a-811e-b58a-d62cc504920a","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — x"}'
+} >"$INTROOT/.iroha/index.ndjson"
+printf '%s\n' '**Latest (2026-06-25):** x.' '## Recent sessions' \
+  '- [2026-06-25 — x](https://www.notion.so/38a822c6938a811eb58ad62cc504920a)' \
+  '## Unfinished / Next' '- [ ] y' '## Decisions' '- [Decisions DB](https://www.notion.so/128c8c81e60d4443a82cabfd84eb243f)' \
+  >"$INTROOT/.iroha/state.md"
+eq integrity-clean "0" "$(iroha_integrity "$INTROOT" >/dev/null 2>&1; echo $?)"
+# the Decisions-DB link in "## Decisions" must NOT be mistaken for a dangling session link.
+hasnt integrity-ignores-decisions-link "128c8c81" "$(iroha_integrity "$INTROOT" 2>&1)"
+# duplicate Active topic (the rot that most degrades recall) -> flagged.
+printf '%s\n' '{"type":"decision","id":"d3","topic":"連結","status":"Active","date":"2026-06-25","title":"連結: dup"}' \
+  >>"$INTROOT/.iroha/index.ndjson"
+eq integrity-dup-active-fail "1" "$(iroha_integrity "$INTROOT" >/dev/null 2>&1; echo $?)"
+has integrity-dup-active-msg "duplicate Active" "$(iroha_integrity "$INTROOT" 2>&1)"
+# a superseded row on the same topic is history, NOT a duplicate-Active conflict (keep the
+# session row State links to, so only the superseded-vs-active rule is under test here).
+{
+  printf '%s\n' '{"type":"decision","id":"d1","topic":"連結","status":"Active","date":"2026-06-24","title":"連結: URL"}'
+  printf '%s\n' '{"type":"decision","id":"d0","topic":"連結","status":"Superseded","date":"2026-06-20","title":"連結: 旧"}'
+  printf '%s\n' '{"type":"session","id":"38a822c6-938a-811e-b58a-d62cc504920a","topic":"","status":"Complete","date":"2026-06-25","title":"2026-06-25 — x"}'
+} >"$INTROOT/.iroha/index.ndjson"
+eq integrity-superseded-ok "0" "$(iroha_integrity "$INTROOT" >/dev/null 2>&1; echo $?)"
+# duplicate id (upsert failed to replace) -> flagged.
+printf '%s\n' '{"type":"decision","id":"d1","topic":"other","status":"Active","date":"2026-06-25","title":"other"}' \
+  >>"$INTROOT/.iroha/index.ndjson"
+has integrity-dup-id "duplicate index id" "$(iroha_integrity "$INTROOT" 2>&1)"
+# malformed index line -> flagged (we WANT this loud, unlike the tolerant extract path).
+printf '%s\n' '{"type":"decision","id":"d1","topic":"x","status":"Active","date":"2026-06-24","title":"x"}' >"$INTROOT/.iroha/index.ndjson"
+printf '{"type":"decision"\n' >>"$INTROOT/.iroha/index.ndjson"
+has integrity-malformed "malformed index line" "$(iroha_integrity "$INTROOT" 2>&1)"
+# dangling State->session link (State ahead of saved sessions: the memory-hole class) -> flagged.
+printf '%s\n' '{"type":"session","id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","topic":"","status":"Complete","date":"2026-06-25","title":"a"}' >"$INTROOT/.iroha/index.ndjson"
+printf '%s\n' '**Latest:** x.' '## Recent sessions' '- [y](https://www.notion.so/ffffffffffffffffffffffffffffffff)' '## Decisions' '- [DB](u)' >"$INTROOT/.iroha/state.md"
+has integrity-dangling-state "State ahead of saved sessions" "$(iroha_integrity "$INTROOT" 2>&1)"
+rm -rf "$INTROOT"
+# the project's REAL committed substrate must be clean (continuous self-monitoring in CI: a drifted
+# index or a State-ahead-of-sessions hole can never reach green).
+eq integrity-real-substrate "0" "$(iroha_integrity "$HERE/.." >/dev/null 2>&1; echo $?)"
 
 echo "=== result: $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ]

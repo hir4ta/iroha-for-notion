@@ -84,6 +84,22 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
   feature described as present/absent that the code disproves. (medium — a doc that lies erodes the
   same trust a rotted decision does; hardcoded metrics in prose are the usual culprit, so prefer
   pointing readers at the live test output over pinning a number.)
+- **I. Index drift (the local index is INCOMPLETE vs Notion)** — the enumeration index only stays
+  authoritative if it actually holds every decision/session Notion has. Dogfooding found it silently
+  ~22% short (Active decisions created in Notion but never `index.sh upsert`-ed), which makes
+  proactive recall AND every index-based audit check (A/C above) under-enumerate without any signal.
+  **This is the check whose absence let that drift hide — run it every audit.** First the
+  deterministic offline floor (catches malformed rows, duplicate ids, duplicate Active topics, and a
+  State that points at a session missing from the index):
+  `bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/integrity.sh" "$PWD"` — treat anything it prints as
+  high-confidence. Then the Notion reconciliation the offline floor cannot do: enumerate the Decisions
+  DB as completely as the free plan allows (several broad `notion-search` passes over `decisions_ds_id`
+  plus the ids the index already knows), collect the **distinct decision page ids Notion returns**, and
+  diff against `index.sh list "$PWD" decision`. Flag every Notion decision id **absent from the index**
+  (it can never be recalled proactively) and every index id whose `notion-fetch` 404s (stale row).
+  Because the free plan cannot list a DB exhaustively, report the Notion side as a **lower bound** —
+  "≥ N decisions in Notion vs M in the index" — and never claim the index is complete just because the
+  counts happen to match a partial search. (high — the rot that silently shrinks recall coverage.)
 
 ## 3. Report (always)
 
@@ -113,6 +129,12 @@ report), apply **only the safe, reversible** fixes and re-report each:
 - **H (repo-doc drift)** — propose the corrected line citing the current measured value, and
   apply on confirmation; for a live metric, prefer phrasing it as a **dated snapshot** so it
   does not re-rot.
+- **I (index drift / reindex)** — for each Notion decision/session id missing from the index, fetch
+  it and `index.sh upsert "$PWD" <type> <id> <topic> <status> <date> "<Name>" "<Project>" "<snippet>"`
+  (regenerate the ≤160-char snippet from its Rationale/Summary, ending on a word boundary), and drop
+  any index row whose id 404s. Re-run `integrity.sh` and the Notion diff until they reconcile. Remind
+  the user to commit `.iroha/index.ndjson`. This is the **reindex repair**; it is reversible (it only
+  adds/refreshes keys — Notion stays the content source of truth) so it is safe to apply on confirmation.
 - **C / E / F** — these need human judgment (delete? rewrite? demote?). Report them with a
   recommended action but **do not** auto-apply; ask.
 

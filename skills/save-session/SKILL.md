@@ -331,8 +331,27 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" upsert "$PWD" session \
   "<session_page_id>" "" "<Status>" "<YYYY-MM-DD>" "<Name>" "<Project>" "<Summary snippet ≤160 chars>"
 ```
 
-Report the Session page URL, how many decisions were recorded, and that the Project
-State was updated.
+**Verify the index before declaring done (root-cause guard for index drift).** A forgotten
+`index.sh upsert` silently drops a decision from the enumeration index — recall then can never
+surface it and audit under-counts, with no error at save time (this is exactly how the index drifted
+~22% short while dogfooding). So after the writes, confirm the substrate is consistent and that
+**every decision page you created this session is in the index**:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/integrity.sh" "$PWD"   # must exit 0 (no malformed/dup/State-dangling)
+# for each decision page id you created above, confirm it is now indexed:
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" list "$PWD" decision | jq -r .id | grep -qF "<decision_page_id>" \
+  || echo "MISSING FROM INDEX: <decision_page_id> — upsert it before finishing"
+```
+
+If anything is missing or `integrity.sh` prints an issue, fix it (upsert the row / correct the
+mirror) and re-check until clean — do **not** finish on a drifted substrate.
+
+Report the Session page URL, how many decisions were recorded, that the Project State was
+updated, and that the index verified clean. **Remind the user to commit `.iroha/state.md` and
+`.iroha/index.ndjson`** in the same commit as the code — State must only ever change through
+save-session (a hand-edit in an unrelated commit is what once left State ahead of the saved
+sessions; integrity's State↔index check now flags the worst form of that).
 
 ## Notes
 
