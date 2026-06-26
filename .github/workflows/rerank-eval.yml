@@ -1,0 +1,56 @@
+name: Rerank eval (manual / weekly)
+
+# rerank is an OPT-IN precision layer: a ~570MB local cross-encoder (bge-reranker-v2-m3) that the
+# pure-bash default does NOT need. The always-on CI (ci.yml) already verifies the pure-bash recall
+# path AND the rerank PLUMBING (contract + graceful BM25 fallback, in tests/selftest.sh). What it
+# cannot verify without the model is the rerank MODEL QUALITY (0 false-injection + the JP/EN
+# synonym-gap recall win). This job closes that gap on the REAL default model — but it is NOT on
+# push/PR: a 570MB Hugging Face download per push would be slow and couple every build to HF uptime,
+# which is the wrong trade for an opt-in feature. So an opt-in feature gets opt-in verification:
+# trigger it by hand (workflow_dispatch) or let the weekly cron run it. It is non-blocking, so a
+# transient HF hiccup never blocks a PR — just re-run it. (A lightweight model was evaluated and
+# rejected: japanese-reranker-xsmall-v2 leaks the 映画 hard-negative and misses the JP/EN synonym
+# case, so only the real default actually passes the eval.)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+jobs:
+  rerank-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      # The reranker runtime is a per-user opt-in dep (kept out of the shipped package.json), so
+      # install it here without saving — same as scripts/rerank-setup.sh does for a real user.
+      - name: Install reranker runtime
+        run: npm install --no-save @huggingface/transformers
+
+      # Cache the ~570MB model across runs, keyed on the immutable model id (so the weekly run and
+      # manual runs reuse it; only a cache miss re-downloads). The model lives where rerank.mjs looks
+      # for it (IROHA_MODEL_DIR, default $HOME/.iroha-for-notion/models).
+      - name: Cache reranker model
+        uses: actions/cache@v4
+        with:
+          path: ~/.iroha-for-notion/models
+          key: iroha-rerank-model-bge-reranker-v2-m3-onnx-q8
+
+      # Pre-download the model on a cache miss (IROHA_RERANK_ALLOW_DOWNLOAD=1). At eval time
+      # rerank.mjs runs cache-only (no download), so the model must be present before test:rerank.
+      - name: Pre-fetch model (cache miss only; eval itself runs offline-from-cache)
+        run: |
+          printf '%s' '{"query":"warmup","docs":[{"id":"w","text":"warmup passage"}],"threshold":0.0,"topn":1}' \
+            | IROHA_RERANK_ALLOW_DOWNLOAD=1 IROHA_MODEL_DIR="$HOME/.iroha-for-notion/models" \
+              node scripts/rerank.mjs
+
+      # The real eval on the real default model: 0 false-injection (precision) + every TRUE case
+      # surfaced incl. the JP/EN synonym gap (recall). Verified locally to pass on bge-m3 q8.
+      - name: Rerank precision + recall eval (bge-reranker-v2-m3)
+        run: IROHA_MODEL_DIR="$HOME/.iroha-for-notion/models" npm run test:rerank
