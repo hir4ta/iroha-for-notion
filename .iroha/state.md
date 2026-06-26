@@ -1,4 +1,4 @@
-**Latest (2026-06-26):** 三度目の反復評価で総合73/100。最大発見=実config `decisions_ds_id=DSID` が canonical な recall/audit/決定保存を黙殺(proactive recall は index 経由で動くため不可視)。`config.sh validate`(ID形の offline 自己監視)を追加し `--selfcheck`/selftest/audit に配線、実config を修復して根治。selftest 98→103 全green、1 commit。
+**Latest (2026-06-26):** 三度目の評価→config妥当性の自己監視を実装し Critical(`decisions_ds_id=DSID` が canonical recall/audit/決定保存を黙殺)を根治(selftest 98→103)。続けて `/iroha:audit` 相当でコンテンツ rot を一掃: 欠落決定「完全性: integrity floor 常設」を DB 化、偽 http リンク3件・recall 100% 陳腐化・hybrid の scope・Projects 陳腐化(JavaScript 追記)を修正、CI に gitleaks/typos を追加(pre-commit とミラー)。全 green・4 commit。
 
 ## Recent sessions
 - [2026-06-26 — config自己監視と三度目の評価](https://app.notion.com/p/38b822c6938a81a98378cb726b9c516d)
@@ -8,11 +8,10 @@
 - [2026-06-25 — トラスト根治とスケール実証](https://app.notion.com/p/38a822c6938a8189b9e6f5c84d304efa)
 
 ## Unfinished / Next
-- [ ] Notionコンテンツ rot を `/iroha:audit` で修正: M-1(欠落決定「完全性: integrity floor 常設」をDB作成)・M-3(偽httpリンク3件 `search.sh`/`state-lint.sh`/`CLAUDE.md`)・recall 100% 陳腐化snippet・M-2(Projects に JavaScript 追記)・H-1(hybrid決定の scope明記)
-- [ ] CI に `gitleaks`/`typos` 追加(pre-commit ⊋ CI=秘密スキャンの穴)
-- [ ] ハイブリッド検索(BM25 ∪ dense)→ rerank(rerank単体では候補化漏れ=今の2 MISSを直せない)
-- [ ] rerank 前段を非iroha/非日本語の実プロジェクトで実証(N=1脱出) [carried 2x]
-- [ ] 旧 Session ページ群の体裁リトロフィット [carried 6x]
+- [ ] ハイブリッド検索(BM25 ∪ dense)→ rerank(rerank 単体では候補化漏れ=今の2 MISS を直せない。recall@3=81% の本道)
+- [ ] rerank 前段を非iroha/非日本語の実プロジェクトで実証(N=1 脱出) [carried 2x]
+- [ ] 旧 Session ページ群の体裁リトロフィット(再保存で自動反映) [carried 6x]
+- [ ] 小粒: `extract.sh` が `<teammate-message>` を人間 turn に計上(isMeta 類似の新ノイズ class)・`digest` の index 列挙化・`release.yml` の version/test ゲート
 
 ## Decisions
 過去の判断・理由・却下案は [Decisions DB](https://app.notion.com/p/128c8c81e60d4443a82cabfd84eb243f) を参照。実装前に `/iroha:recall <topic>` で確認(UserPromptSubmit フックがローカル BM25 で関連決定を常時先出し)。
