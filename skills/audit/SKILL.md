@@ -77,13 +77,13 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
   cross-project layer is **manually updated**, so it rots silently. Fix = re-run
   `/iroha:project`. (low.)
 - **H. Repo-doc drift** — everything above audits Notion + the State mirror, but the repo's own
-  committed docs can carry stale claims that readers (and recall) trust. Grep `CHANGELOG.md`,
-  `README.md`, and `.claude/rules/architecture.md` for **hardcoded metrics or claims that no
-  longer hold**: a cited recall metric (`Recall@k` / `MRR` / abstention) that differs from the
-  current `bash tests/recall-eval.sh` output; a DB/architecture count contradicting the 3-DB
-  model; a feature described as present/absent that the code disproves. (medium — a doc that lies
-  erodes the same trust a rotted decision does; this is exactly how a stale `MRR = 0.94` survived
-  in `CHANGELOG.md` after the memory itself had been corrected.)
+  committed docs can carry stale claims that readers (and recall) trust. Grep `README.md` and
+  `.claude/rules/architecture.md` for **hardcoded metrics or claims that no longer hold**: a cited
+  recall metric (`Recall@k` / `MRR` / abstention) that differs from the current
+  `bash tests/recall-eval.sh` output; a DB/architecture count contradicting the 3-DB model; a
+  feature described as present/absent that the code disproves. (medium — a doc that lies erodes the
+  same trust a rotted decision does; hardcoded metrics in prose are the usual culprit, so prefer
+  pointing readers at the live test output over pinning a number.)
 
 ## 3. Report (always)
 
