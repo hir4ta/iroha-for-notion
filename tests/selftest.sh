@@ -336,6 +336,38 @@ else
   echo "  SKIP  rerank gate (node not available)"
 fi
 
+# embed gate (OPT-IN dense bi-encoder) — the candidate GENERATOR for hybrid recall (the semantic
+# near-matches BM25 misses). Like the reranker, the contract paths are deterministic WITHOUT the
+# model: embed.mjs exits 3 when the runtime/model is absent, so the heavy tier degrades to BM25-only
+# candidates. The dense RECOVERY itself is measured in tests/hybrid-eval.sh (runs only with models).
+echo "=== embed gate (opt-in dense retrieval: contract + graceful fallback) ==="
+EMBED="$HERE/../scripts/embed.mjs"
+if command -v node >/dev/null 2>&1; then
+  eq embed-empty-docs-abstain "[]" "$(printf '{"query":"x","docs":[]}' | node "$EMBED" 2>/dev/null)"
+  printf 'not-json' | node "$EMBED" >/dev/null 2>&1
+  eq embed-bad-json-exit2 "2" "$?"
+  printf '{"query":"x","docs":[{"id":"a","text":"b"}]}' | IROHA_MODEL_DIR="$(mktemp -d)" node "$EMBED" >/dev/null 2>&1
+  eq embed-no-model-exit3 "3" "$?"
+else
+  echo "  SKIP  embed gate (node not available)"
+fi
+
+# recall.sh — the single local-recall code path shared by the hook and tests/hybrid-eval.sh. FREE
+# tier (heavy off) returns the pure BM25 advisory hits. HEAVY tier armed but models absent degrades
+# to the SAME BM25 hits (embed/rerank exit 3): never a crash, and never empty when BM25 has a hit —
+# the promote-not-veto invariant that fixed the silent recall regression of the old veto path.
+echo "=== recall.sh (free tier BM25; heavy-armed-no-model keeps BM25 hits, never drops one) ==="
+RCFREE=$(env IROHA_CONFIG_DIR="$RIDATA3" \
+  bash "$HERE/../scripts/_lib/recall.sh" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
+has recall-free-tier-bm25 "連結: relation でなく URL" "$RCFREE"
+if command -v node >/dev/null 2>&1; then
+  RCEMPTY=$(mktemp -d)
+  RCHEAVY=$(env IROHA_CONFIG_DIR="$RIDATA3" IROHA_RECALL_FORCE_HEAVY=1 IROHA_MODEL_DIR="$RCEMPTY" \
+    bash "$HERE/../scripts/_lib/recall.sh" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
+  has recall-heavy-no-model-keeps-bm25 "連結: relation でなく URL" "$RCHEAVY"
+  rm -rf "$RCEMPTY"
+fi
+
 rm -rf "$RIDATA" "$RIDATA2" "$RIDATA3" "$RIPROJ" "$RICACHE"
 
 echo "=== state-lint (State body validator: escapes, missing sections, summary, real mirror) ==="

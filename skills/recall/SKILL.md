@@ -109,20 +109,22 @@ these terms* — retry with different terms before concluding it is absent.
 ## Notes
 
 - **Two-stage recall (Adaptive-RAG routing).** The `UserPromptSubmit` hook
-  (`recall-inject.sh`) runs a cheap, always-on **local BM25** pass over the index
-  (`search.sh`) on every substantive prompt — offline, no LLM, no Notion round-trip — and
-  proactively surfaces the top matching decisions as pointers. **This skill is the deep
-  second stage**: the user or Claude escalates to `/iroha:recall` when that cheap pointer is
-  not enough, and here we add Notion **semantic** search (catches paraphrase the local
-  lexical pass misses) plus full `Rationale` / `Alternatives` / changed-files synthesis.
-- **The local lexical stage trades precision for zero cost.** Being pure BM25 over a small,
-  single-domain index, an off-topic prompt that merely shares the project's *software*
-  vocabulary can surface an irrelevant decision — and neither a higher floor nor a coverage gate
-  cleanly separates that from a real paraphrase (measured). So the hook's injected pointers are
-  **advisory** ("possibly relevant; verify"): if a surfaced decision does not actually bear on
-  the request, treat it as noise and ignore it — never force it into the answer. This semantic
-  stage is the precision filter; a *local* semantic pass is a deferred upgrade (YAGNI at this
-  scale), not a shipped feature.
+  (`recall-inject.sh` → `recall.sh :: iroha_recall_local`) runs the cheap, always-on **local**
+  stage on every substantive prompt — offline, no LLM, no Notion round-trip — and proactively
+  surfaces the top matching decisions as pointers. Its FREE tier is pure-jq BM25 (`search.sh`);
+  an OPT-IN HEAVY tier adds a local dense bi-encoder (`embed.mjs`) for the semantic near-matches
+  BM25 misses and a cross-encoder that *promotes* strong matches above the BM25 list (it never
+  vetoes a BM25 hit — that cost real recall). **This skill is the deep second stage**: the user
+  or Claude escalates to `/iroha:recall` when that cheap pointer is not enough, and here we add
+  Notion **semantic** search plus full `Rationale` / `Alternatives` / changed-files synthesis.
+- **The local stage is recall-first; its pointers are advisory.** On a small, single-domain
+  corpus an off-topic prompt that merely shares the project's *software* vocabulary can surface an
+  irrelevant decision — and no local signal (BM25 score, dense rank, or the cross-encoder's low
+  end) cleanly separates that from a real-but-terse match (measured). The floor is intentionally
+  not raised to suppress it, because that trades away real recall (the north-star value). So the
+  hook's injected pointers are **advisory** ("possibly relevant; verify"): if a surfaced decision
+  does not actually bear on the request, treat it as noise and ignore it — never force it into the
+  answer. This `/iroha:recall` semantic stage + your judgement are the precision filter.
 - Recall reads decision/session *content* live from Notion (the single source of truth),
   so it is always current. The repo's `.iroha/index.ndjson` is **not** a content mirror —
   it holds keys + a short derived search snippet (id / topic / status / date / title / a

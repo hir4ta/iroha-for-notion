@@ -24,15 +24,27 @@
   `Languages` のみ multi_select、横断検索 (同言語/同 lib の他プロジェクト) に使う。Architecture には
   「なぜ」を書かず Decisions へリンク。
 - **リコールは2段 (Adaptive-RAG ルーティング)**。①常時の**安価ローカル前段**=
-  `scripts/_lib/search.sh` が `.iroha/index.ndjson` に対し pure-jq の **BM25**(CJK 2-gram
-  トークナイズ・status/type 重み)を回す。LLM もネットワークも要らず即時・オフライン・無料で、
-  UserPromptSubmit hook が毎プロンプト proactively に関連決定を注入する。②深い**semantic 後段**=
-  `/iroha:recall` が `notion-search`(無料で動く)で言い換えも拾い、`notion-fetch` で
-  Rationale/Alternatives/変更ファイルまで合成する。前段で足りる時は後段を起動しない(コスト/遅延ゼロ)。
-  この規模・専門語ドメインでは lexical ≈ dense (BEIR/小規模研究) なので前段が価値の大半を担う。
-  index 全件列挙(`query-data-sources` が有料＝列挙不能を補完)で dedup・abstention・audit を**完全**に行う。
-  `/iroha:recall` は relevance+recency+importance で少数を edges-first に返す (該当無しは正直に abstain)。
+  `scripts/_lib/recall.sh :: iroha_recall_local`。**FREE tier**(既定・無依存)= `search.sh` の
+  pure-jq **BM25**(CJK 2-gram トークナイズ・status/type 重み)。LLM もネットワークも要らず即時・
+  オフライン・無料で、UserPromptSubmit hook が毎プロンプト proactively に注入する。**HEAVY tier**
+  (opt-in・`rerank_enabled`=true で arm)= **BM25 ∪ dense**(`scripts/embed.mjs`=ローカル bi-encoder
+  `multilingual-e5-small`)で候補生成し、cross-encoder(`scripts/rerank.mjs`=`bge-reranker-v2-m3`)が
+  **強い意味一致を BM25 advisory の上に promote する(veto はしない)**。理由: cross-encoder はこの
+  terse な日本語コーパスで**バイモーダル**(近言い換えは>0.4、希少な実マッチ「連結: relation でなく
+  URL」は~0.003 で off-topic と区別不能)。veto 設計は実マッチを黙って落とし**recall を犠牲**にする
+  (旧 rerank tier がそうで、BM25 専用の recall-eval が end-to-end を測らず盲点化していた)。よって
+  BM25 ヒットは sacrosanct(recall=北極星)、dense は候補生成漏れ(=今まで直せなかった MISS)を**足す**だけ。
+  結果は単調(hybrid recall ≥ BM25 recall)。同一語彙の偽陽性 leak は BM25/dense/合意/cross-encoder の
+  どれでも実マッチと分離不能=固有限界として**正直に計測**(`hybrid-eval.sh` が soft-leak を報告)、
+  ただし advisory なので低害(floor は上げない)。②深い**semantic 後段**= `/iroha:recall` が
+  `notion-search`(無料で動く)で言い換えも拾い、`notion-fetch` で Rationale/Alternatives/変更ファイル
+  まで合成する。前段で足りる時は後段を起動しない(コスト/遅延ゼロ)。index 全件列挙(`query-data-sources`
+  が有料＝列挙不能を補完)で dedup・abstention・audit を**完全**に行う。`/iroha:recall` は
+  relevance+recency+importance で少数を edges-first に返す (該当無しは正直に abstain)。
   supersede は `トピック:` 前方一致＋index、加えて search.sh の近傍検索で別トピック名の重複も拾う。
+  品質は `recall-eval`(FREE tier=86%)/`hybrid-eval`(HEAVY tier=93%・MISS 回復・abstention 100%・
+  soft-leak 報告)/`rerank-eval`(cross-encoder 単体精度)で**重なる golden set**(`tests/golden-recall.txt`)
+  を計測し、評価の盲点(tier 毎に別 set で回帰を隠す)を作らない。
 - **repo ミラーは `.iroha/state.md`（State 全文）と `.iroha/index.ndjson`（keys＋検索snippet）の 2 つ**
   （ともに commit し teammate は pull で共有）。SessionStart hook は Notion 非到達なので `state.md`
   を注入。**決定の本文はローカルに持たない**（Notion 正本）。index は id/topic/status/date に加え、
