@@ -5,53 +5,71 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: CI only reads the repo.
+permissions:
+  contents: read
+
+# A newer push to the same ref cancels the older, still-running CI.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint-and-test:
+  # Static analysis: formatting/lint + types. Fast; fails the PR on style or type drift.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      # node is only for the OPT-IN heavy-tier model scripts (scripts/*.mjs); the FREE tier and all
-      # of `bun test` need only bun. Without the ~700MB models the rerank eval SKIPs (exit 0).
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "20"
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install deps
-        run: bun install --frozen-lockfile
-
+      - run: bun install --frozen-lockfile
       - name: Lint (biome)
         run: bun run lint
-
       - name: Typecheck (tsc)
         run: bun run typecheck
 
-      # Secret + typo scans — run them THROUGH pre-commit (not the standalone marketplace actions)
-      # so CI uses the EXACT same hooks, pinned versions, and .gitignore / _typos.toml handling as a
-      # developer's local `pre-commit run`. pre-commit guarantees CI == local.
+  # Behavioral oracle: the in-process unit tests for the deterministic libs + hooks.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Behavioral test (bun test — the oracle)
+        run: bun test
+
+  # Recall quality: FREE-tier BM25 accuracy + scale; the rerank (HEAVY) eval SKIPs without the
+  # opt-in model (exit 0). node is pre-installed on the runner for the rerank probe's SKIP path.
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Recall quality eval (FREE tier BM25)
+        run: bun run test:recall
+      - name: Recall scale check
+        run: bun run test:scale
+      - name: Rerank precision eval (skips unless the opt-in model is installed)
+        run: bun run test:rerank
+
+  # Supply-chain hygiene: secret + typo scans run THROUGH pre-commit so CI uses the EXACT same
+  # pinned hooks / .gitignore / _typos.toml as a developer's local `pre-commit run` (CI == local).
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - name: Install pre-commit
         run: pip install pre-commit
       - name: Secret scan (gitleaks)
         run: pre-commit run gitleaks --all-files
       - name: Typo scan (typos)
         run: pre-commit run typos --all-files
-
-      - name: Behavioral test (bun test — the oracle)
-        run: bun test
-
-      - name: Recall quality eval (FREE tier BM25)
-        run: bun run test:recall
-
-      - name: Recall scale check
-        run: bun run test:scale
-
-      - name: Rerank precision eval (skips unless the opt-in model is installed)
-        run: bun run test:rerank
