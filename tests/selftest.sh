@@ -417,10 +417,13 @@ eq ci-gate-non-commit "" "$(ci 'git status' cci2)"                    # only `gi
 eq ci-gate-disable "" "$(ci 'git commit -m "relationで連結"' cci3 IROHA_CHECK_DISABLE=1)"
 eq ci-cache-second-empty "" "$(ci 'git commit -m "relationで連結する設計を変更"' cci1)"  # one note per subject/session
 eq ci-abstain "" "$(ci 'git commit -m "deploy the kubernetes cluster to aws"' cci4)"  # no governing decision
-# consent gate: recall_enabled not set (RIDATA3) -> no advisory.
-eq ci-gate-consent "" "$(printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"relationで連結\""},"session_id":"cci5","cwd":"%s"}' "$RIPROJ" |
-  env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA3" TMPDIR="$RICACHE" IROHA_RERANK_DISABLE=1 \
-    bash "$HERE/../hooks/check-inject.sh")"
+# consent gate: recall_enabled not set (RIDATA3) -> no advisory. Reuse ci() (which escapes the
+# command via `jq -Rs .`) and override the config dir through the trailing env arg — env takes the
+# LAST value, so IROHA_CONFIG_DIR="$RIDATA3" wins over the helper's default RIDATA. (Hand-building
+# this JSON with printf '...\"...\"...' silently mis-escaped the inner quotes — bash printf turns
+# \" into a bare " — so the input was malformed JSON and the hook exited on the parse failure, not
+# on the consent gate: the test passed for the wrong reason and leaked jq parse errors to stderr.)
+eq ci-gate-consent "" "$(ci 'git commit -m "relationで連結"' cci5 IROHA_CONFIG_DIR="$RIDATA3")"
 
 rm -rf "$RIDATA" "$RIDATA2" "$RIDATA3" "$RIPROJ" "$RICACHE"
 
