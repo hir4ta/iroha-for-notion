@@ -415,6 +415,31 @@ test("search (CJK bigram, text field, status weight, abstention, valid+ordered)"
   ).map((l) => JSON.parse(l).score);
   expect(scored).toEqual([...scored].sort((a, b) => b - a)); // descending
 });
+test("search — English corpus recall (N=1 readiness: non-Japanese project)", () => {
+  // iroha's golden evals are Japanese; this guards that recall also works on an English-only
+  // corpus (the alnum-whole-token path + English stopword removal), so a non-Japanese project
+  // gets real recall, not silence — the core risk when leaving the N=1 (self-only) state.
+  const root = mktmp();
+  mkdirSync(join(root, ".iroha"), { recursive: true });
+  writeFileSync(
+    join(root, ".iroha", "index.ndjson"),
+    [
+      '{"type":"decision","id":"e1","topic":"auth","status":"Active","date":"2026-01-01","title":"Auth: JWT not sessions","project":"demo","text":"use stateless JWT tokens for authentication instead of server-side sessions for horizontal scaling"}',
+      '{"type":"decision","id":"e2","topic":"database","status":"Active","date":"2026-01-01","title":"Database: Postgres over Mongo","project":"demo","text":"use PostgreSQL for relational data with strong consistency guarantees"}',
+      '{"type":"decision","id":"e3","topic":"styling","status":"Active","date":"2026-01-01","title":"Styling: Tailwind","project":"demo","text":"adopt tailwind utility classes for consistent design tokens"}',
+      "",
+    ].join("\n"),
+  );
+  const first = (q: string) =>
+    JSON.parse(lines(bun([SEARCH, root, q, "decision", "3"]).out)[0] as string);
+  expect(first("should we use JWT for authentication").id).toBe("e1");
+  expect(first("what database should we pick").id).toBe("e2");
+  // a cross-domain English query shares no vocabulary -> honest abstain (no false injection)
+  expect(
+    bun([SEARCH, root, "how to deploy a kubernetes cluster", "decision", "3"])
+      .out,
+  ).toBe("");
+});
 
 // ── integrity: malformed / dup-id / dup-active / State-link / lineage ───────────────────────────
 function intRoot(rows: string[], state?: string): string {
