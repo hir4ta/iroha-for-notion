@@ -147,6 +147,72 @@ export function indexList(root: string, type = ""): Record<string, unknown>[] {
   return type === "" ? recs : recs.filter((r) => r.type === type);
 }
 
+// True if a record with this id (optionally constrained to a type) is indexed. The membership
+// primitive save-session §9 uses to confirm every decision it created is indexed — a typed
+// replacement for `list | jq -r .id | grep -qF "<id>"`, which mis-handles an empty id and treats
+// regex metacharacters in an id as a pattern (false matches / misses).
+export function indexHas(root: string, id: string, type = ""): boolean {
+  if (id === "") return false;
+  return indexRead(root).some(
+    (r) => r.id === id && (type === "" || r.type === type),
+  );
+}
+
+// Active records, optionally of a type (decisions carry Status=Active). Replaces the per-skill
+// `list | jq -c 'select(.status=="Active")'` filter with a typed enumeration.
+export function indexActive(
+  root: string,
+  type = "",
+): Record<string, unknown>[] {
+  return indexRead(root).filter(
+    (r) => r.status === "Active" && (type === "" || r.type === type),
+  );
+}
+
+// Topics that have MORE THAN ONE Active decision — the duplicate-topic signal audit reports (two
+// Active rows under one topic usually means one should be Superseded). Case-insensitive on ASCII
+// (matching find-topic); each offending topic returned once, in first-seen original casing.
+// Replaces audit's `list | jq -s 'group_by(.topic)|map(select(length>1))...'`.
+export function indexDupTopics(root: string): string[] {
+  const seen = new Map<string, { topic: string; count: number }>();
+  for (const r of indexRead(root)) {
+    if (r.type !== "decision" || r.status !== "Active") continue;
+    const topic = String(r.topic ?? "");
+    if (topic === "") continue;
+    const key = asciiDowncase(topic);
+    const e = seen.get(key);
+    if (e) e.count += 1;
+    else seen.set(key, { topic, count: 1 });
+  }
+  return [...seen.values()].filter((e) => e.count > 1).map((e) => e.topic);
+}
+
+// Records whose date falls within [start, end] INCLUSIVE (ISO YYYY-MM-DD strings compare
+// lexically), sorted NEWEST FIRST. Optional type and status filters. A record with an empty /
+// too-short date is skipped (it cannot be placed in a period). Replaces digest's per-skill `jq`
+// range+status+sort pipe in one typed call.
+export function indexInRange(
+  root: string,
+  start: string,
+  end: string,
+  type = "",
+  status = "",
+): Record<string, unknown>[] {
+  return indexRead(root)
+    .filter((r) => {
+      if (type !== "" && r.type !== type) return false;
+      if (status !== "" && r.status !== status) return false;
+      const d = String(r.date ?? "");
+      if (d.length < 10) return false;
+      return d >= start && d <= end;
+    })
+    .sort((a, b) => {
+      const da = String(a.date ?? "");
+      const db = String(b.date ?? "");
+      return da < db ? 1 : da > db ? -1 : 0;
+    });
+}
+
 // CLI: usable from skills as `bun index.ts <cmd> ...`. Each case returns the process exit code.
 function runCli(): number {
   const [cmd, ...rest] = process.argv.slice(2);
@@ -180,9 +246,33 @@ function runCli(): number {
     case "list":
       emit(indexList(rest[0] ?? "", rest[1] ?? ""));
       return 0;
+    case "has":
+      // has <root> <type> <id>  (type "" = any) -> exit 0 if indexed, 1 if absent
+      return indexHas(rest[0] ?? "", rest[2] ?? "", rest[1] ?? "") ? 0 : 1;
+    case "active":
+      // active <root> [type] -> Active records as NDJSON
+      emit(indexActive(rest[0] ?? "", rest[1] ?? ""));
+      return 0;
+    case "dup-topics":
+      // dup-topics <root> -> one topic per line with >1 Active decision
+      for (const t of indexDupTopics(rest[0] ?? ""))
+        process.stdout.write(`${t}\n`);
+      return 0;
+    case "in-range":
+      // in-range <root> <start> <end> [type] [status] -> records in [start,end], newest first
+      emit(
+        indexInRange(
+          rest[0] ?? "",
+          rest[1] ?? "",
+          rest[2] ?? "",
+          rest[3] ?? "",
+          rest[4] ?? "",
+        ),
+      );
+      return 0;
     default:
       process.stderr.write(
-        "usage: index.ts <path|upsert|find-topic|chain|list> ...\n",
+        "usage: index.ts <path|upsert|find-topic|chain|list|has|active|dup-topics|in-range> ...\n",
       );
       return 2;
   }

@@ -308,6 +308,62 @@ test("index (upsert by id, find-topic, list, supersede chain)", () => {
   expect(topicX.find((r) => r.id === "chA").supersedes ?? "null").toBe("null");
 });
 
+// ── index: typed query subcommands (has / active / dup-topics / in-range) ─────────────────────────
+test("index has/active/dup-topics/in-range (typed replacements for shell jq/grep)", () => {
+  const root = mktmp();
+  const up = (...a: string[]) => bun([INDEX, "upsert", root, ...a]);
+  up("decision", "d1", "alpha", "Active", "2026-06-10", "alpha: x", "demo");
+  up("decision", "d2", "beta", "Active", "2026-06-20", "beta: y", "demo");
+  up("decision", "d3", "Alpha", "Active", "2026-06-25", "alpha: z", "demo"); // dup topic (ASCII-ci) of d1
+  up("decision", "d4", "gamma", "Superseded", "2026-06-21", "gamma: w", "demo");
+  up("session", "s1", "", "Complete", "2026-06-15", "2026-06-15 work", "demo");
+
+  // has: present -> exit 0, absent / empty id / wrong type -> exit 1, any-type with "" -> match
+  expect(bun([INDEX, "has", root, "decision", "d1"]).code).toBe(0);
+  expect(bun([INDEX, "has", root, "decision", "nope"]).code).toBe(1);
+  expect(bun([INDEX, "has", root, "decision", ""]).code).toBe(1);
+  expect(bun([INDEX, "has", root, "session", "d1"]).code).toBe(1);
+  expect(bun([INDEX, "has", root, "", "s1"]).code).toBe(0);
+
+  // active: only Active rows of the type (d4 Superseded excluded)
+  const active = lines(bun([INDEX, "active", root, "decision"]).out).map((l) =>
+    JSON.parse(l),
+  );
+  expect(
+    active
+      .map((r) => r.id)
+      .sort()
+      .join(","),
+  ).toBe("d1,d2,d3");
+
+  // dup-topics: alpha has 2 Active (d1 + d3, ASCII case-insensitive); beta/gamma do not
+  expect(bun([INDEX, "dup-topics", root]).out.trim()).toBe("alpha");
+
+  // in-range: inclusive [start,end], NEWEST FIRST (d4=06-21, d2=06-20, s1=06-15)
+  const range = lines(
+    bun([INDEX, "in-range", root, "2026-06-15", "2026-06-21"]).out,
+  ).map((l) => JSON.parse(l));
+  expect(range.map((r) => r.id).join(",")).toBe("d4,d2,s1");
+  // type filter
+  const rangeDec = lines(
+    bun([INDEX, "in-range", root, "2026-06-15", "2026-06-21", "decision"]).out,
+  ).map((l) => JSON.parse(l));
+  expect(rangeDec.map((r) => r.id).join(",")).toBe("d4,d2");
+  // type + status filter (only Active decisions in window -> d2; d4 is Superseded)
+  const rangeActive = lines(
+    bun([
+      INDEX,
+      "in-range",
+      root,
+      "2026-06-15",
+      "2026-06-21",
+      "decision",
+      "Active",
+    ]).out,
+  ).map((l) => JSON.parse(l));
+  expect(rangeActive.map((r) => r.id).join(",")).toBe("d2");
+});
+
 // ── search: BM25 (CJK bigram, text field, status weight, abstention) ────────────────────────────
 function searchRoot(): string {
   const root = mktmp();

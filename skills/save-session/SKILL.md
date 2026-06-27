@@ -92,7 +92,7 @@ from your memory of the session, but the **You** side is anchored to the determi
 happened — keep dead-ends, corrections, and abandoned approaches at the same weight as the
 wins. Do **not** inflate success in the Summary, Progress, or Decisions; an over-rosy memory
 misleads the next session as surely as a wrong one. Any metric you state (tests passed,
-commits, files) must come from `extract.sh stats` or a real command's output — never
+commits, files) must come from `extract.ts stats` or a real command's output — never
 estimated or rounded up. If you are unsure something happened, leave it out rather than
 assert it.
 
@@ -186,11 +186,11 @@ show Project / Status / Type / Date / Branch / Author at the top:
    the same "Full chat" appear twice. The child page's own title carries the turn count, so it is
    self-explanatory without a toggle.
 Wrap every file name / command / path in backticks — **including inside callouts and
-tables** — so Notion does not auto-linkify `.sh` / `.md` names as `http://…` URLs.
+tables** — so Notion does not auto-linkify `.ts` / `.md` names as `http://…` URLs.
 Indent callout / toggle / table children with **tabs**. Keep the returned page URL.
 
 **Lint for auto-linkify BEFORE publishing — deterministic gate, not eyeballing.** Backticking
-by hand recurs as a leak (it has turned `extract.sh` / `CLAUDE.md` in this very page into bogus
+by hand recurs as a leak (it has turned `extract.ts` / `CLAUDE.md` in this very page into bogus
 `http://…` links). So before the `notion-create-pages`, write the composed `content` to a temp
 file and run `bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.ts" <file>`; it lists every bare
 file / command / path token sitting outside a backtick span / code fence / `[text](url)` link.
@@ -223,7 +223,7 @@ for the index upserts in step 9.
 The cleaned full chat (the `.chat` array from step 3) is **paged out** of the Session page to
 keep it scannable, but it must be **real** — never a placeholder. It is the *cleaned* chat,
 not a raw dump: **every turn is present** (none dropped), but each turn is **capped per-turn**
-(`extract.sh` truncates a long turn to ~600 chars with a `… (truncated)` marker — this is by
+(`extract.ts` truncates a long turn to ~600 chars with a `… (truncated)` marker — this is by
 design, so do not claim it is "verbatim/unbounded"). After the Session page exists (step 5),
 create a child page under it: `notion-create-pages` with
 `parent: {"type":"page_id","page_id":"<session_page_id>"}`, title **`Full chat — N turns`**
@@ -328,7 +328,7 @@ condensation) — NOT the canonical content: Notion stays the single source of t
 fetches the full `Rationale` / `Alternatives` from there. The snippet is regenerated on every
 save (like an embedding would be), so it cannot drift into a second truth. It exists so (a)
 dedup / supersede / audit can enumerate the **complete** set free-plan search cannot, and (b)
-the local BM25 recall (`search.sh`, the cheap always-on first stage in the UserPromptSubmit
+the local BM25 recall (`search.ts`, the cheap always-on first stage in the UserPromptSubmit
 hook) can match a prompt against the *reason* a decision was made — not just its title (matching
 the title alone misses "do we need an API token?" → "Notion: MCP only", whose reason is the
 token, not the title).
@@ -391,7 +391,7 @@ in the user's conversation language):
 
 Write **real newlines / tabs**, never the two-character sequences `\n` / `\t` (they leak into
 Notion as literal `nt`/`n`). Wrap any file/command/path in backticks so Notion does not
-auto-linkify `.sh`/`.md` names as URLs.
+auto-linkify `.ts`/`.md` names as URLs.
 
 **Triage the carry-over** every time (this keeps `Unfinished` from rotting into a
 graveyard): for each item carried from the prior State, decide done / still-active /
@@ -466,8 +466,9 @@ surface it and audit under-counts, with no error at save time (this is exactly h
 
 ```bash
 bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/integrity.ts" "$PWD"   # must exit 0 (no malformed/dup/State-dangling)
-# for each decision page id you created above, confirm it is now indexed:
-bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts" list "$PWD" decision | jq -r .id | grep -qF "<decision_page_id>" \
+# for each decision page id you created above, confirm it is now indexed (typed membership check —
+# exit 0 = indexed, exit 1 = missing; no jq/grep, so an empty id or regex metachar can't mis-match):
+bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts" has "$PWD" decision "<decision_page_id>" \
   || echo "MISSING FROM INDEX: <decision_page_id> — upsert it before finishing"
 ```
 

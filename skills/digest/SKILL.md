@@ -48,13 +48,10 @@ work saved moments ago, then `notion-fetch` each id for its body.
 
 ```bash
 IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
-# Complete window enumeration, newest first (ISO YYYY-MM-DD dates compare lexicographically).
-bun "$IDX" list "$PWD" session \
-  | jq -s -c --arg s "$START" --arg e "$END" \
-      'map(select(.date>=$s and .date<=$e)) | sort_by(.date) | reverse | .[]'
-bun "$IDX" list "$PWD" decision \
-  | jq -s -c --arg s "$START" --arg e "$END" \
-      'map(select(.date>=$s and .date<=$e and .status=="Active")) | sort_by(.date) | reverse | .[]'
+# Complete window enumeration, newest first — typed range query (no jq); the 4th/5th args are
+# optional type / status filters. Sessions in the window, then Active decisions in the window:
+bun "$IDX" in-range "$PWD" "$START" "$END" session
+bun "$IDX" in-range "$PWD" "$START" "$END" decision Active
 ```
 
 - **Sessions** — the index lines give the complete `id` / `title` / `date` / `status`. For each,

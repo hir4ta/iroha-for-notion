@@ -167,7 +167,7 @@ API token.
    callouts and lists inserted via MCP). **`fetch` the page afterward to confirm no leak.** Also
    run the composed guide/caption text through
    `bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.ts"` before publishing — it flags bare
-   file/path tokens (`extract.sh` / `CLAUDE.md`) Notion would auto-linkify; backtick them until it
+   file/path tokens (`extract.ts` / `CLAUDE.md`) Notion would auto-linkify; backtick them until it
    exits 0.
 
    **(a) Navigation — a short bold lead line + a bulleted list** (insert at `{"type":"start"}`),
@@ -210,10 +210,10 @@ API token.
       `/iroha:recall <topic>`; refresh the stack with `/iroha:project` when it changes."
     - that **proactive recall is now armed**: each substantive prompt gets a bounded local recall
       of relevant past decisions (disable with `IROHA_RECALL_DISABLE=1`; check readiness with
-      `bash "${CLAUDE_PLUGIN_ROOT}/hooks/recall-inject.sh" --selfcheck`).
+      `bun "${CLAUDE_PLUGIN_ROOT}/hooks/recall-inject.ts" --selfcheck`).
 
-    **Optional higher-precision recall (opt-in, heavy).** Proactive recall runs on the pure-bash
-    BM25 stage by default — zero deps, instant. For higher precision (a local cross-encoder reranker
+    **Optional higher-precision recall (opt-in, heavy).** Proactive recall runs on the dependency-free
+    TS BM25 stage by default — zero deps, instant. For higher precision (a local cross-encoder reranker
     that filters out same-vocabulary-but-off-topic decisions BM25 cannot separate), the user can run
     `npm run rerank:setup` once: it installs a Node runtime dep and downloads a local model
     (~570MB for the default multilingual model, or set

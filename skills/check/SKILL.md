@@ -48,7 +48,7 @@ The local index lists **every** decision (free-plan `notion-search` cannot enume
 `Active` ones — those are the live constraints a change can violate:
 
 ```bash
-bun "$IDX" list "$ROOT" decision | jq -c 'select(.status=="Active")'   # id/topic/title/snippet
+bun "$IDX" active "$ROOT" decision   # Active decisions as NDJSON (typed filter, no jq)
 ```
 
 The Active set is small, so you can scan all of it against the diff. To **narrow to the most
