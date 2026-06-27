@@ -29,7 +29,11 @@
   Projects=manual `/iroha:project`・恒久スタック)。カデンツも責務も違うので**畳まず相互リンク**で繋ぐ:
   State の `## Decisions` 節が Projects 行へ、Projects 行 callout が State へリンクする。container
   callout は最重要の **State ページを名前でなくリンク**で出し、決定は Decisions の **`Active` view** に
-  名指しで誘導する (初見の到達性)。
+  名指しで誘導する (初見の到達性)。**ルートのガイドは一行ベタ書きにせず**「どこに何があるか」の箇条書き＋
+  メタ callout に分け、加えて **linked chart view のダッシュボード**(Sessions 推移/Type・Decisions
+  Topic/Status)を載せてデータが溜まるほど可視化される (init が生成＝再 init/配布で再現)。MCP で callout/
+  list を挿入する時は **real newline/tab を使う**(`\n`/`\t` の2文字は `nt`/`n` として leak＝State publish
+  と同じ罠)・挿入後は `fetch` で leak を検証。
 - **3層メモリ**: Session=各回の出来事 / Decision=なぜ / **Projects (Architecture)=今の技術スタック**
   (言語・lib・CI・mermaid 図、手動更新 `/iroha:project`)。Projects は 1 行=1 プロジェクトの共有 DB、
   `Languages` のみ multi_select、横断検索 (同言語/同 lib の他プロジェクト) に使う。Architecture には
