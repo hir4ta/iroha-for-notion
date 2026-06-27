@@ -50,7 +50,7 @@ answer (Self-RAG / CRAG). For a completeness-critical "does a decision on X exis
 check, consult the local index — exhaustive where search is not:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" find-topic "$PWD" "<topic>"
+bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts" find-topic "$PWD" "<topic>"
 ```
 
 ## 2c. Cross-check the complete local index (hybrid recall)
@@ -60,9 +60,9 @@ from its index for a few minutes** (Notion search has write-lag). So also enumer
 *complete, instantly-current* local index and pick anything relevant that search missed:
 
 ```bash
-IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
-bash "$IDX" list "$PWD" decision   # every decision: id / topic / status / date / title
-bash "$IDX" list "$PWD" session    # every session
+IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
+bun "$IDX" list "$PWD" decision   # every decision: id / topic / status / date / title
+bun "$IDX" list "$PWD" session    # every session
 ```
 
 Read the titles/topics, pick any that match the query but were **not** already returned by

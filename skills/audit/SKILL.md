@@ -15,29 +15,29 @@ Report in the **user's conversation language**.
 ## 1. Preconditions
 
 ```bash
-L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
+L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
 bun "$L" get decisions_ds_id    # empty -> tell the user to run /iroha:init, then stop
 bun "$L" get session_ds_id
 bun "$L" get-state "$PWD"        # the State page id (may be empty on a fresh project)
-bash "$IDX" list "$PWD" decision  # COMPLETE list of decision keys — the enumeration search lacks
-bash "$IDX" list "$PWD" session   # COMPLETE list of session keys
+bun "$IDX" list "$PWD" decision  # COMPLETE list of decision keys — the enumeration search lacks
+bun "$IDX" list "$PWD" session   # COMPLETE list of session keys
 ```
 
 ## 2. Run the checks (read-only)
 
-**Enumerate from the local index** (`index.sh list` above) — it is the *complete* set of
+**Enumerate from the local index** (`index.ts list` above) — it is the *complete* set of
 decision/session keys, which free-plan `notion-search` cannot reproduce. `notion-fetch` each
 id that needs its content inspected, and collect findings. (If the index is empty or stale —
 an older workspace created before the index existed — fall back to `notion-search` and **say
 so**: results are then best-effort, not complete. Offer to backfill: fetch the known rows and
-`index.sh upsert` each into the index so future audits are exhaustive.)
+`index.ts upsert` each into the index so future audits are exhaustive.)
 
 - **A. Duplicate Active decisions** — two `Status = Active` rows sharing the same `<topic>`
   are a conflict (one should be `Superseded`). Now **exhaustive** via the index — every
   conflicted topic, not just what search surfaced. Use **pure jq** (not `sort | uniq -d`,
   which mis-groups multibyte/Japanese topics under some locales — a real false-positive
   found while dogfooding):
-  `bash "$IDX" list "$PWD" decision | jq -s 'map(select(.status=="Active"))|group_by(.topic)|map(select(length>1))|map(.[0].topic)|.[]'`
+  `bun "$IDX" list "$PWD" decision | jq -s 'map(select(.status=="Active"))|group_by(.topic)|map(select(length>1))|map(.[0].topic)|.[]'`
   (severity: high — the defect that most rots recall.)
 - **B. Should-be-superseded** — an `Active` decision whose `Rationale` is contradicted by
   a newer `Active` decision on the same topic, or which a later Session's decisions
@@ -93,7 +93,7 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
   pointing readers at the live test output over pinning a number.)
 - **I. Index drift (the local index is INCOMPLETE vs Notion)** — the enumeration index only stays
   authoritative if it actually holds every decision/session Notion has. Dogfooding found it silently
-  ~22% short (Active decisions created in Notion but never `index.sh upsert`-ed), which makes
+  ~22% short (Active decisions created in Notion but never `index.ts upsert`-ed), which makes
   proactive recall AND every index-based audit check (A/C above) under-enumerate without any signal.
   **This is the check whose absence let that drift hide — run it every audit.** First the
   deterministic offline floor (catches malformed rows, duplicate ids, duplicate Active topics, and a
@@ -106,7 +106,7 @@ so**: results are then best-effort, not complete. Offer to backfill: fetch the k
   flag any that 404 (config points at a deleted / wrong data source). Then the Notion reconciliation the offline floor cannot do: enumerate the Decisions
   DB as completely as the free plan allows (several broad `notion-search` passes over `decisions_ds_id`
   plus the ids the index already knows), collect the **distinct decision page ids Notion returns**, and
-  diff against `index.sh list "$PWD" decision`. Flag every Notion decision id **absent from the index**
+  diff against `index.ts list "$PWD" decision`. Flag every Notion decision id **absent from the index**
   (it can never be recalled proactively) and every index id whose `notion-fetch` 404s (stale row).
   Because the free plan cannot list a DB exhaustively, report the Notion side as a **lower bound** —
   "≥ N decisions in Notion vs M in the index" — and never claim the index is complete just because the
@@ -141,7 +141,7 @@ report), apply **only the safe, reversible** fixes and re-report each:
   apply on confirmation; for a live metric, prefer phrasing it as a **dated snapshot** so it
   does not re-rot.
 - **I (index drift / reindex)** — for each Notion decision/session id missing from the index, fetch
-  it and `index.sh upsert "$PWD" <type> <id> <topic> <status> <date> "<Name>" "<Project>" "<snippet>"`
+  it and `index.ts upsert "$PWD" <type> <id> <topic> <status> <date> "<Name>" "<Project>" "<snippet>"`
   (regenerate the ≤160-char snippet from its Rationale/Summary, ending on a word boundary), and drop
   any index row whose id 404s. Re-run `integrity.sh` and the Notion diff until they reconcile. Remind
   the user to commit `.iroha/index.ndjson`. This is the **reindex repair**; it is reversible (it only
@@ -156,8 +156,8 @@ report), apply **only the safe, reversible** fixes and re-report each:
 - With the local index, decision/session **enumeration is now complete** (not just search's
   top-N), so the duplicate-Active (A) and orphan (C) checks are exhaustive rather than
   heuristic. The *content* checks (B contradiction, F granularity) still need judgment via
-  `notion-fetch`. Reconcile drift: if `index.sh list` and Notion disagree (an id 404s, or a
-  status differs), fix the index with `index.sh upsert`. Better a flagged false positive than
+  `notion-fetch`. Reconcile drift: if `index.ts list` and Notion disagree (an id 404s, or a
+  status differs), fix the index with `index.ts upsert`. Better a flagged false positive than
   silent rot.
 - Re-run after big sessions, before onboarding a teammate, or when recall starts
   returning conflicting answers.

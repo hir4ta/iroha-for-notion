@@ -20,8 +20,7 @@ set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 SEARCH="$HERE/../scripts/_lib/search.sh"
-# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
-. "$HERE/../scripts/_lib/index.sh"
+INDEX="$HERE/../scripts/_lib/index.ts"
 K=3
 MINSCORE="${IROHA_RECALL_MINSCORE:-1.2}"   # production relevance floor (keep in sync with hook)
 TIMEOUT_S=5                                # the UserPromptSubmit hook timeout (hooks/hooks.json)
@@ -77,8 +76,8 @@ abs=$(bash "$SEARCH" "$ROOT" "deploy the kubernetes cluster with terraform on aw
 if [ -z "$abs" ]; then printf '  PASS  abstain on unrelated query\n'; pass=$((pass + 1))
 else printf '  FAIL  abstain leaked: %s\n' "$(printf '%s' "$abs" | head -1)"; fail=$((fail + 1)); fi
 
-# enumeration completeness at scale: index.sh list returns every row.
-listed=$(iroha_index_list "$ROOT" | grep -c .)
+# enumeration completeness at scale: index.ts list returns every row.
+listed=$(bun "$INDEX" list "$ROOT" | grep -c .)
 if [ "$listed" = "$total" ]; then printf '  PASS  enumeration complete (%s/%s)\n' "$listed" "$total"; pass=$((pass + 1))
 else printf '  FAIL  enumeration dropped rows (%s/%s)\n' "$listed" "$total"; fail=$((fail + 1)); fi
 

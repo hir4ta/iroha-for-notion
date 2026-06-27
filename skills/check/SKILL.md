@@ -17,7 +17,7 @@ reports, never writes. Report in the **user's conversation language**.
 ## 1. Preconditions
 
 ```bash
-L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
+L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
 bun "$L" get decisions_ds_id    # empty -> tell the user to run /iroha:init, then stop
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "NOT_A_GIT_REPO"; }  # stop if not
 ```
@@ -48,7 +48,7 @@ The local index lists **every** decision (free-plan `notion-search` cannot enume
 `Active` ones — those are the live constraints a change can violate:
 
 ```bash
-bash "$IDX" list "$ROOT" decision | jq -c 'select(.status=="Active")'   # id/topic/title/snippet
+bun "$IDX" list "$ROOT" decision | jq -c 'select(.status=="Active")'   # id/topic/title/snippet
 ```
 
 The Active set is small, so you can scan all of it against the diff. To **narrow to the most

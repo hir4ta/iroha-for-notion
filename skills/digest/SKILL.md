@@ -47,12 +47,12 @@ Enumerate the window from the index so the digest's counts and lists are exhaust
 work saved moments ago, then `notion-fetch` each id for its body.
 
 ```bash
-IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
+IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
 # Complete window enumeration, newest first (ISO YYYY-MM-DD dates compare lexicographically).
-bash "$IDX" list "$PWD" session \
+bun "$IDX" list "$PWD" session \
   | jq -s -c --arg s "$START" --arg e "$END" \
       'map(select(.date>=$s and .date<=$e)) | sort_by(.date) | reverse | .[]'
-bash "$IDX" list "$PWD" decision \
+bun "$IDX" list "$PWD" decision \
   | jq -s -c --arg s "$START" --arg e "$END" \
       'map(select(.date>=$s and .date<=$e and .status=="Active")) | sort_by(.date) | reverse | .[]'
 ```

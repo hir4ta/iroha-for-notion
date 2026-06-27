@@ -260,7 +260,7 @@ set `Supersedes` = the **Notion URL of the decision it replaced**
 
 **Ensure the `Topic` option exists (same as `Project`, 5.0).** `Topic` is a SELECT and does
 **not** auto-create options on write — a new topic 400s unless added first. Reuse the topics you
-already see in the local index (`bash "$IDX" find-topic` below lists them); if this decision's
+already see in the local index (`bun "$IDX" find-topic` below lists them); if this decision's
 `<topic>` is new, `notion-update-data-source <decisions_ds_id>` `ALTER COLUMN "Topic" SET
 SELECT(<existing topics…>, '<topic>':color)` before creating the row (include existing options —
 SET replaces the list). Prefer reusing an existing topic string over coining a near-synonym, so
@@ -274,8 +274,8 @@ rows that don't surface for your terms. **Consult the local index first** — it
 decision's `{topic, status, id}` exhaustively:
 
 ```bash
-ROOT="$PWD"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
-bash "$IDX" find-topic "$ROOT" "<topic>"   # every existing row on this topic (any status)
+ROOT="$PWD"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
+bun "$IDX" find-topic "$ROOT" "<topic>"   # every existing row on this topic (any status)
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/search.sh" "$ROOT" "<this decision's topic + choice>" decision 5
 ```
 
@@ -309,9 +309,9 @@ stays intact):
 ```bash
 # after creating a Decision (capture its page id from notion-create-pages). The 10th arg is the
 # bare id of the decision this one SUPERSEDES (empty for an original) — the lineage /iroha:history walks:
-bash "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-MM-DD>" "<Name>" "<Project>" "<rationale snippet ≤160 chars>" "<old_page_id-if-superseding-else-empty>"
+bun "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-MM-DD>" "<Name>" "<Project>" "<rationale snippet ≤160 chars>" "<old_page_id-if-superseding-else-empty>"
 # after superseding an old one (keep its snippet so it stays searchable as history):
-bash "$IDX" upsert "$ROOT" decision "<old_page_id>" "<topic>" Superseded "<old_date>" "<old_Name>" "<Project>" "<old rationale snippet>"
+bun "$IDX" upsert "$ROOT" decision "<old_page_id>" "<topic>" Superseded "<old_date>" "<old_Name>" "<Project>" "<old rationale snippet>"
 ```
 
 The index holds **keys + a derived search snippet** (topic / status / id / a short rationale
@@ -445,12 +445,12 @@ mkdir -p "$SAVED" && : > "$SAVED/${CLAUDE_SESSION_ID}"
 # always-on local recall can match; a symptom written solely in the Session page body is
 # reachable only by explicit /iroha:recall (semantic), so the proactive hook would never warn
 # "you hit this before". This is what completes the Reflexion loop the § Failures wording promises.
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" upsert "$PWD" session \
+bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts" upsert "$PWD" session \
   "<session_page_id>" "" "<Status>" "<YYYY-MM-DD>" "<Name>" "<Project>" "<Summary+failure-symptom snippet ≤160 chars>"
 ```
 
 **Verify the index before declaring done (root-cause guard for index drift).** A forgotten
-`index.sh upsert` silently drops a decision from the enumeration index — recall then can never
+`index.ts upsert` silently drops a decision from the enumeration index — recall then can never
 surface it and audit under-counts, with no error at save time (this is exactly how the index drifted
 ~22% short while dogfooding). So after the writes, confirm the substrate is consistent and that
 **every decision page you created this session is in the index**:
@@ -458,7 +458,7 @@ surface it and audit under-counts, with no error at save time (this is exactly h
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/integrity.sh" "$PWD"   # must exit 0 (no malformed/dup/State-dangling)
 # for each decision page id you created above, confirm it is now indexed:
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh" list "$PWD" decision | jq -r .id | grep -qF "<decision_page_id>" \
+bun "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts" list "$PWD" decision | jq -r .id | grep -qF "<decision_page_id>" \
   || echo "MISSING FROM INDEX: <decision_page_id> — upsert it before finishing"
 ```
 

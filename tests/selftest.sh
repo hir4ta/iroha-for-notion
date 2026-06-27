@@ -226,31 +226,30 @@ rm -rf "$HOOKHOME" "$HOOKDATA" "$PROJ"
 
 echo "=== index (local enumeration: upsert by id, find-topic, list) ==="
 IDXROOT=$(mktemp -d "${TMPDIR:-/tmp}/iroha-idx-root.XXXXXX")
-# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
-. "$HERE/../scripts/_lib/index.sh"
-iroha_index_upsert "$IDXROOT" decision dec1 "linking" Active 2026-06-24 "linking: URL" demo
-iroha_index_upsert "$IDXROOT" decision dec2 "runtime" Active 2026-06-24 "runtime: bash" demo
-iroha_index_upsert "$IDXROOT" session ses1 "" Complete 2026-06-25 "2026-06-25 eval" demo
+IDX="$HERE/../scripts/_lib/index.ts"
+bun "$IDX" upsert "$IDXROOT" decision dec1 "linking" Active 2026-06-24 "linking: URL" demo
+bun "$IDX" upsert "$IDXROOT" decision dec2 "runtime" Active 2026-06-24 "runtime: bash" demo
+bun "$IDX" upsert "$IDXROOT" session ses1 "" Complete 2026-06-25 "2026-06-25 eval" demo
 # upsert by id replaces in place: a status change must not duplicate the row
-iroha_index_upsert "$IDXROOT" decision dec1 "linking" Superseded 2026-06-24 "linking: URL" demo
-idxall=$(iroha_index_list "$IDXROOT")
+bun "$IDX" upsert "$IDXROOT" decision dec1 "linking" Superseded 2026-06-24 "linking: URL" demo
+idxall=$(bun "$IDX" list "$IDXROOT")
 eq index-no-dup-on-reupsert "1" "$(printf '%s\n' "$idxall" | grep -c '"id":"dec1"')"
-eq index-status-replaced "Superseded" "$(iroha_index_find_topic "$IDXROOT" "linking" | jq -r '.status')"
+eq index-status-replaced "Superseded" "$(bun "$IDX" find-topic "$IDXROOT" "linking" | jq -r '.status')"
 # find-topic is case-insensitive on ASCII (the decision dedup key)
-eq index-find-topic-ci "dec2" "$(iroha_index_find_topic "$IDXROOT" "RUNTIME" | jq -r '.id')"
-eq index-find-topic-miss "" "$(iroha_index_find_topic "$IDXROOT" "missing-topic")"
-eq index-list-decisions "2" "$(iroha_index_list "$IDXROOT" decision | grep -c '"type":"decision"')"
-eq index-list-sessions "1" "$(iroha_index_list "$IDXROOT" session | grep -c '"type":"session"')"
-eq index-valid-ndjson "ok" "$(iroha_index_list "$IDXROOT" | jq -e . >/dev/null 2>&1 && echo ok || echo bad)"
-# supersede LINEAGE: the 10th upsert arg records the predecessor id; index.sh chain walks the chain
+eq index-find-topic-ci "dec2" "$(bun "$IDX" find-topic "$IDXROOT" "RUNTIME" | jq -r '.id')"
+eq index-find-topic-miss "" "$(bun "$IDX" find-topic "$IDXROOT" "missing-topic")"
+eq index-list-decisions "2" "$(bun "$IDX" list "$IDXROOT" decision | grep -c '"type":"decision"')"
+eq index-list-sessions "1" "$(bun "$IDX" list "$IDXROOT" session | grep -c '"type":"session"')"
+eq index-valid-ndjson "ok" "$(bun "$IDX" list "$IDXROOT" | jq -e . >/dev/null 2>&1 && echo ok || echo bad)"
+# supersede LINEAGE: the 10th upsert arg records the predecessor id; index.ts chain walks the chain
 # newest->oldest. This is the offline primitive /iroha:history follows to show "v3 <- v2 <- v1".
-iroha_index_upsert "$IDXROOT" decision chA "topicX" Superseded 2026-06-24 "topicX: v1" demo "first" ""
-iroha_index_upsert "$IDXROOT" decision chB "topicX" Superseded 2026-06-25 "topicX: v2" demo "second" "chA"
-iroha_index_upsert "$IDXROOT" decision chC "topicX" Active 2026-06-26 "topicX: v3" demo "third" "chB"
-eq index-supersedes-stored "chB" "$(iroha_index_find_topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chC")|.supersedes')"
-eq index-chain-walk "chC,chB,chA" "$(iroha_index_chain "$IDXROOT" chC | jq -r '.id' | paste -sd',' -)"
-eq index-chain-single "chA" "$(iroha_index_chain "$IDXROOT" chA | jq -r '.id' | paste -sd',' -)"
-eq index-original-no-supersedes "null" "$(iroha_index_find_topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chA")|.supersedes // "null"')"
+bun "$IDX" upsert "$IDXROOT" decision chA "topicX" Superseded 2026-06-24 "topicX: v1" demo "first" ""
+bun "$IDX" upsert "$IDXROOT" decision chB "topicX" Superseded 2026-06-25 "topicX: v2" demo "second" "chA"
+bun "$IDX" upsert "$IDXROOT" decision chC "topicX" Active 2026-06-26 "topicX: v3" demo "third" "chB"
+eq index-supersedes-stored "chB" "$(bun "$IDX" find-topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chC")|.supersedes')"
+eq index-chain-walk "chC,chB,chA" "$(bun "$IDX" chain "$IDXROOT" chC | jq -r '.id' | paste -sd',' -)"
+eq index-chain-single "chA" "$(bun "$IDX" chain "$IDXROOT" chA | jq -r '.id' | paste -sd',' -)"
+eq index-original-no-supersedes "null" "$(bun "$IDX" find-topic "$IDXROOT" "topicX" | jq -r 'select(.id=="chA")|.supersedes // "null"')"
 rm -rf "$IDXROOT"
 
 echo "=== search (local BM25 recall: CJK bigram, text field, status weight, abstention) ==="

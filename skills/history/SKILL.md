@@ -15,7 +15,7 @@ writes. Report in the **user's conversation language**.
 ## 1. Preconditions
 
 ```bash
-L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.sh"
+L="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/config.ts"; IDX="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/index.ts"
 SEARCH="${CLAUDE_PLUGIN_ROOT}/scripts/_lib/search.sh"; ROOT="$PWD"
 bun "$L" get decisions_ds_id    # empty -> tell the user to run /iroha:init, then stop
 ```
@@ -29,7 +29,7 @@ to the original. Find that head from `$ARGUMENTS`:
 
 ```bash
 # a) Exact-ish topic match (the "<topic>:" prefix is the dedup key).
-bash "$IDX" find-topic "$ROOT" "$ARGUMENTS"
+bun "$IDX" find-topic "$ROOT" "$ARGUMENTS"
 # b) Fuzzy fallback when the user typed a paraphrase, not the literal topic.
 bash "$SEARCH" "$ROOT" "$ARGUMENTS" decision 5 0
 ```
@@ -43,7 +43,7 @@ Pick the head:
 ## 3. Walk the lineage (offline, from the local index)
 
 ```bash
-bash "$IDX" chain "$ROOT" "<head-id>"   # newest first: head, predecessor, …, original
+bun "$IDX" chain "$ROOT" "<head-id>"   # newest first: head, predecessor, …, original
 ```
 
 Each line is a decision record `{id, topic, status, date, title, supersedes, text}`. A chain of
