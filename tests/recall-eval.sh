@@ -40,27 +40,8 @@ ABSTAIN_THRESHOLD=100                 # require 100% honest abstention (a false 
 # not just decisions — closing the blind spot that the set was previously all-decision (a measured
 # re-check found session recall actually healthy: distinctive-work queries rank 1-2; these lock it
 # against regression).
-read -r -d '' GOLDEN <<'EOF'
-Notionの認証はAPIトークンが必要か|389822c6-938a-8137-824d-e4883efdbcf5
-SessionとDecisionの連結にrelationを使うべきか|389822c6-938a-812a-86fc-f709b3428ec2
-compactした後に会話を復元したい|38a822c6-938a-8159-8bca-c1edc602bb62
-トランスクリプト抽出はbashとClaudeのどちらでやる|389822c6-938a-811c-9f41-e8dba15ef28f
-リコールの設計方針はどうする|38a822c6-938a-81af-a4ab-c38c9f533b07
-会話ログの全文はどこに保存する|38a822c6-938a-8175-8a6d-ece0145279ad
-メモリの全件列挙はどうやる|38a822c6-938a-8167-98c2-fd940cb1dd06
-StateをローカルにミラーするのはなぜJIT|389822c6-938a-81ef-829e-c0f6b1bc2b91
-Notionに書く前にStateの破損を防ぎたい|38a822c6-938a-8155-a95f-fd6cf2fe351d
-ミラーとNotionのStateがズレないようにしたい|38a822c6-938a-8143-a364-f3ee8152e4a7
-セッション終了時に自動でNotionへ保存すべきか|38a822c6-938a-811e-b923-eba8f03e1866
-リコールを毎プロンプトのheadlessからローカル検索に作り替えた回|38a822c6-938a-8160-92e3-fb101f391cdb
-Stateの破損を根治して数百件規模でスケール検証した回|38a822c6-938a-8189-b9e6-f5c84d304efa
-未保存セッションを知らせる保存バックログを実装した回|38a822c6-938a-811e-b58a-d62cc504920a
-cross-encoderのrerankで誤注入を消した回|38b822c6-938a-8186-9424-e9ceb358df3d
-configure nginx reverse proxy with tls termination|NONE
-optimize the react component re-rendering performance|NONE
-terraform provider configuration for gcp networking|NONE
-おすすめの映画を教えてほしい|NONE
-EOF
+# Single source of truth: tests/golden-recall.txt (shared with hybrid-eval.sh). Skip comments/blanks.
+GOLDEN="$(grep -vE '^[[:space:]]*(#|$)' "$(dirname "$0")/golden-recall.txt")"
 
 pos_total=0; pos_hit=0; mrr_sum=0
 abs_total=0; abs_ok=0
