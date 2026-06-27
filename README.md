@@ -36,7 +36,8 @@ changed, and why.
   `/iroha:recall` escalates to Notion **semantic** search (`notion-search`, free plan) for the
   full rationale and rejected alternatives. The free tier carries most of the weight; the semantic
   stage catches the paraphrases it misses.
-  *Optional:* `bun run rerank:setup` arms a local **hybrid** tier — a dense bi-encoder
+  *Optional:* a local **hybrid** tier (armed once by the `bun "<plugin>/scripts/rerank-setup.ts"`
+  command `/iroha:init` prints — runs from any project, installs into the plugin not your cwd) — a dense bi-encoder
   (`multilingual-e5-small`) generates the semantic near-matches BM25 can't (zero lexical overlap),
   and a **cross-encoder reranker** (`bge-reranker-v2-m3`) *promotes* the strong matches above the
   BM25 list. Measured on this repo's index: it recovers a candidate-generation MISS the lexical

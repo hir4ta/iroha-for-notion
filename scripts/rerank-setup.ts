@@ -9,9 +9,10 @@
 // so the heavy tier needs no node/npm — bun alone installs (bun add) and runs it (lib research 2026
 // confirmed transformers.js is the right, still-maintained offline choice — see architecture.md).
 //
-// Run once: bun scripts/rerank-setup.ts
+// Run once, from ANY project cwd (bun add installs into the plugin root, not your cwd):
+//   bun "<iroha-plugin-root>/scripts/rerank-setup.ts"
 // Override either model first (e.g. a lighter, Japanese-specialized reranker):
-//   IROHA_RERANK_MODEL=hotchpotch/japanese-reranker-xsmall-v2 IROHA_RERANK_DTYPE=fp32 bun scripts/rerank-setup.ts
+//   IROHA_RERANK_MODEL=hotchpotch/japanese-reranker-xsmall-v2 IROHA_RERANK_DTYPE=fp32 bun "<iroha-plugin-root>/scripts/rerank-setup.ts"
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -20,6 +21,9 @@ import { join } from "node:path";
 import { configSet } from "./_lib/config.ts";
 
 const SCRIPTS = import.meta.dir;
+// The iroha plugin root. bun add installs HERE (not the caller's cwd), and the disable/verify hints
+// printed below are absolute so a user can run this — and the follow-ups — from ANY project cwd.
+const ROOT = join(SCRIPTS, "..");
 const env = process.env;
 const MODEL =
   env.IROHA_RERANK_MODEL || "onnx-community/bge-reranker-v2-m3-ONNX";
@@ -42,7 +46,7 @@ const install = spawnSync(
   "bun",
   ["add", "--no-save", "@huggingface/transformers"],
   {
-    cwd: join(SCRIPTS, ".."),
+    cwd: ROOT,
     stdio: "inherit",
   },
 );
@@ -121,6 +125,6 @@ promotes the strong matches above the BM25 advisory list (higher recall AND prec
   reranker:  ${MODEL} (${DTYPE})
   embedder:  ${EMODEL} (${EDTYPE})
   model dir: ${MODELDIR}
-  disable:   IROHA_RERANK_DISABLE=1  (per session)  /  bun scripts/_lib/config.ts set rerank_enabled false  (persistent)
-  verify:    IROHA_MODEL_DIR=${MODELDIR} bun tests/hybrid-eval.ts   (recall+abstention end-to-end)
-             IROHA_MODEL_DIR=${MODELDIR} bun tests/rerank-eval.ts   (cross-encoder unit precision)`);
+  disable:   IROHA_RERANK_DISABLE=1  (per session)  /  bun "${ROOT}/scripts/_lib/config.ts" set rerank_enabled false  (persistent)
+  verify:    IROHA_MODEL_DIR=${MODELDIR} bun "${ROOT}/tests/hybrid-eval.ts"   (recall+abstention end-to-end)
+             IROHA_MODEL_DIR=${MODELDIR} bun "${ROOT}/tests/rerank-eval.ts"   (cross-encoder unit precision)`);
