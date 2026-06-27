@@ -44,7 +44,7 @@ interface Rec {
 const NOISE =
   /^\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)/;
 
-function parseRecords(file: string): Rec[] {
+export function parseRecords(file: string): Rec[] {
   const out: Rec[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (line.trim() === "") continue;
@@ -146,7 +146,7 @@ function commandsView(records: Rec[]): string[] {
   return [...new Set(cmds)].sort().map((c) => `- \`${c}\``);
 }
 
-function promptsView(records: Rec[]): string[] {
+export function promptsView(records: Rec[]): string[] {
   return records
     .filter(isRealUser)
     .map((r) => sliceCp(norm(contentStr(r) as string), 200))
@@ -167,7 +167,7 @@ function toolsView(records: Rec[]): string[] {
     .map((e) => `- \`${e.name}\` ×${e.n}`);
 }
 
-function chatView(records: Rec[]): string[] {
+export function chatView(records: Rec[]): string[] {
   const out: string[] = [];
   for (const r of records) {
     if (!notSidechain(r)) continue;
@@ -190,7 +190,7 @@ function chatView(records: Rec[]): string[] {
   return out;
 }
 
-function metaView(records: Rec[]) {
+export function metaView(records: Rec[]) {
   const ts = sortedByTimestamp(records);
   const lastAiTitle = lastWith(records, (r) =>
     r.type === "ai-title" ? r.aiTitle : undefined,
@@ -216,7 +216,7 @@ function metaView(records: Rec[]) {
   };
 }
 
-function statsView(records: Rec[]) {
+export function statsView(records: Rec[]) {
   const ts = sortedByTimestamp(records);
   const tus = toolUses(records);
   const filesEdited = new Set(

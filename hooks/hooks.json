@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\"",
             "timeout": 5
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/recall-inject.sh\"",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/recall-inject.ts\"",
             "timeout": 5
           }
         ]
@@ -32,7 +32,7 @@
           {
             "type": "command",
             "if": "Bash(git commit *)",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-inject.sh\"",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-inject.ts\"",
             "timeout": 5
           }
         ]

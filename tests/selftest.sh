@@ -197,7 +197,7 @@ printf 'STATE-CONTENT-XYZ' >"$PROJ/.iroha/state.md"
 run_hook() {
   printf '{"cwd":"%s","session_id":"cur"}' "$PROJ" |
     CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$HOOKDATA" HOME="$HOOKHOME" \
-      bash "$HERE/../hooks/session-start.sh"
+      bun "$HERE/../hooks/session-start.ts"
 }
 out=$(run_hook)
 has hook-injects-state "STATE-CONTENT-XYZ" "$out"
@@ -212,7 +212,7 @@ hasnt hook-no-remind-when-saved "not saved to Notion" "$(run_hook)"
 printf '{"type":"user","isSidechain":false,"message":{"role":"user","content":"COMPACT-RECAP-PROMPT please"}}\n' >"$HOOKHOME/.claude/projects/$HASH/cur.jsonl"
 cout=$(printf '{"cwd":"%s","session_id":"cur","source":"compact"}' "$PROJ" |
   CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$HOOKDATA" HOME="$HOOKHOME" \
-    bash "$HERE/../hooks/session-start.sh")
+    bun "$HERE/../hooks/session-start.ts")
 has hook-compact-recap "re-injected after compaction" "$cout"
 has hook-compact-prompt "COMPACT-RECAP-PROMPT" "$cout"
 rm -f "$HOOKHOME/.claude/projects/$HASH/cur.jsonl"
@@ -220,7 +220,7 @@ rm -f "$PROJ/.iroha/state.md" "$HOOKHOME/.claude/projects/$HASH/old.jsonl" \
   "$HOOKHOME/.claude/projects/$HASH/trivial.jsonl"
 eq hook-silent-when-empty "" "$(run_hook)"
 # missing CLAUDE_PLUGIN_ROOT must exit 0 silently, not crash under set -u
-env -u CLAUDE_PLUGIN_ROOT HOME="$HOOKHOME" bash "$HERE/../hooks/session-start.sh" <<<'{"cwd":"/x","session_id":"y"}' >/dev/null 2>&1
+env -u CLAUDE_PLUGIN_ROOT HOME="$HOOKHOME" bun "$HERE/../hooks/session-start.ts" <<<'{"cwd":"/x","session_id":"y"}' >/dev/null 2>&1
 eq hook-no-plugin-root-exit0 "0" "$?"
 rm -rf "$HOOKHOME" "$HOOKDATA" "$PROJ"
 
@@ -298,7 +298,7 @@ ri() {  # ri <prompt> <sid> [EXTRA_ENV=val ...]   (no claude/timeout — recall 
   shift 2
   printf '{"prompt":"%s","session_id":"%s","cwd":"%s"}' "$p" "$s" "$RIPROJ" |
     env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA" TMPDIR="$RICACHE" "$@" \
-      bash "$HERE/../hooks/recall-inject.sh"
+      bun "$HERE/../hooks/recall-inject.ts"
 }
 hp=$(ri "relationプロパティで連結すべきか検討したい" sid1)
 has ri-inject-shape "hookSpecificOutput" "$hp"
@@ -321,21 +321,21 @@ eq ri-minscore-floor "" "$(ri "relationで連結する設計" sid8 IROHA_RECALL_
 RIDATA2=$(mktemp -d "${TMPDIR:-/tmp}/iroha-ri-data2.XXXXXX")
 eq ri-not-initialized "" "$(printf '{"prompt":"relationプロパティで連結すべきか","session_id":"sid5","cwd":"%s"}' "$RIPROJ" |
   env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA2" TMPDIR="$RICACHE" \
-    bash "$HERE/../hooks/recall-inject.sh")"
+    bun "$HERE/../hooks/recall-inject.ts")"
 # consent gate: initialized but recall_enabled not set -> no injection (distribution-safe default)
 RIDATA3=$(mktemp -d "${TMPDIR:-/tmp}/iroha-ri-data3.XXXXXX")
 IROHA_CONFIG_DIR="$RIDATA3" bun "$HERE/../scripts/_lib/config.ts" set decisions_ds_id "DSID" >/dev/null
 eq ri-gate-recall-disabled "" "$(printf '{"prompt":"relationプロパティで連結すべきか","session_id":"sid6","cwd":"%s"}' "$RIPROJ" |
   env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA3" TMPDIR="$RICACHE" \
-    bash "$HERE/../hooks/recall-inject.sh")"
+    bun "$HERE/../hooks/recall-inject.ts")"
 # selfcheck (offline, no external round-trip): prerequisites present -> READY, exit 0.
 sc=$(env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA" \
-  bash "$HERE/../hooks/recall-inject.sh" --selfcheck)
+  bun "$HERE/../hooks/recall-inject.ts" --selfcheck)
 has ri-selfcheck-ready "READY" "$sc"
 has ri-selfcheck-config "config initialized" "$sc"
 # selfcheck must work when run by hand (no CLAUDE_PLUGIN_ROOT) by deriving root from $0
 sc2=$(env -u CLAUDE_PLUGIN_ROOT IROHA_CONFIG_DIR="$RIDATA" \
-  bash "$HERE/../hooks/recall-inject.sh" --selfcheck)
+  bun "$HERE/../hooks/recall-inject.ts" --selfcheck)
 has ri-selfcheck-derives-root "READY" "$sc2"
 
 # rerank gate (OPT-IN cross-encoder precision filter) — armed via rerank_enabled. The contract
@@ -407,7 +407,7 @@ ci() {  # ci <commit-command> <sid> [EXTRA_ENV=val ...]
   printf '{"tool_name":"Bash","tool_input":{"command":%s},"session_id":"%s","cwd":"%s"}' \
     "$(printf '%s' "$c" | jq -Rs .)" "$s" "$RIPROJ" |
     env CLAUDE_PLUGIN_ROOT="$HERE/.." IROHA_CONFIG_DIR="$RIDATA" TMPDIR="$RICACHE" \
-      IROHA_RERANK_DISABLE=1 "$@" bash "$HERE/../hooks/check-inject.sh"
+      IROHA_RERANK_DISABLE=1 "$@" bun "$HERE/../hooks/check-inject.ts"
 }
 cp=$(ci 'git commit -m "relationで連結する設計を変更"' cci1)
 has ci-inject-content "連結: relation でなく URL" "$cp"               # the governing Active decision
