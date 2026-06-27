@@ -47,7 +47,10 @@
   BM25 ヒットは sacrosanct(recall=北極星)、dense は候補生成漏れ(=今まで直せなかった MISS)を**足す**だけ。
   結果は単調(hybrid recall ≥ BM25 recall)。同一語彙の偽陽性 leak は BM25/dense/合意/cross-encoder の
   どれでも実マッチと分離不能=固有限界として**正直に計測**(`hybrid-eval.sh` が soft-leak を報告)、
-  ただし advisory なので低害(floor は上げない)。②深い**semantic 後段**= `/iroha:recall` が
+  ただし advisory なので低害(floor は上げない・**coverage gate も入れない**)。floor 引き上げも
+  coverage≥2 gate も**単一強語マッチの実 recall を犠牲**にし recall-sacrosanct に反する: coverage≥2 は
+  selftest の `oauth flow`→`s1`(doc は `oauth` のみ含む単一トークン正答)を落とすことで実証済 ＝ golden
+  だけ見た「無損失」評価は単一強語クラスを盲点化する。precision は意図的に deferred な semantic 段の仕事。②深い**semantic 後段**= `/iroha:recall` が
   `notion-search`(無料で動く)で言い換えも拾い、`notion-fetch` で Rationale/Alternatives/変更ファイル
   まで合成する。前段で足りる時は後段を起動しない(コスト/遅延ゼロ)。index 全件列挙(`query-data-sources`
   が有料＝列挙不能を補完)で dedup・abstention・audit を**完全**に行う。`/iroha:recall` は
