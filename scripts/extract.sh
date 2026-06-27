@@ -15,9 +15,13 @@
 #   meta      JSON {title, started, ended, cwd, gitBranch, model, sessionId}
 #   prompts   the human's actual messages, in order — the You-side anchor for chat
 #             highlights. Tool results, sidechains, harness meta turns (isMeta — e.g. the
-#             "Your tool call was malformed … retry." injection), and system-injected
-#             wrappers (<task-notification> / <command-*> / <system-reminder>) are excluded,
-#             so save-session never has to invent or mis-attribute a "You" line.
+#             "Your tool call was malformed … retry." injection), system-injected wrappers
+#             (<task-notification> / <command-*> / <system-reminder>), **peer-agent messages**
+#             (<teammate-message> / <agent-message> / "Another Claude session sent a message:")
+#             and **injected compaction summaries** ("This session is being continued…" /
+#             isCompactSummary) are all excluded — they are not the human's turns, so
+#             save-session never mis-attributes them as a "You" line (and stats.userTurns counts
+#             only real human prompts, not peer chatter).
 #   stats     JSON {userTurns, assistantTurns, toolCalls, filesEdited, bashCommands,
 #             durationMin, startedAt, endedAt} — the numbers for a metrics dashboard.
 #   tools     per-tool usage tally, most-used first (e.g. "- `Bash` ×12").
@@ -75,7 +79,7 @@ case "$cmd" in
       [ .[] | select(.isSidechain != true) | select(.type == "user")
         | select(.isMeta != true)
         | select(.message.content | type == "string") | .message.content
-        | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
+        | select(test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not)
         | gsub("\\s+"; " ") | gsub("^ +| +$"; "")
         | select(. != "") | .[0:200]
       ] | .[] | "- " + .
@@ -101,7 +105,7 @@ case "$cmd" in
       def realuser: select(.isSidechain != true) | select(.type == "user")
         | select(.isMeta != true)
         | select(.message.content | type == "string")
-        | select(.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not);
+        | select(.message.content | test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not);
       def asof: .timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
       (map(select(.timestamp)) | sort_by(.timestamp)) as $t
       | {
@@ -128,7 +132,7 @@ case "$cmd" in
     records | jq -rs '
       [ .[] | select(.isSidechain != true)
         | if (.type == "user" and (.isMeta != true) and (.message.content | type == "string")
-              and (.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not))
+              and (.message.content | test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not))
           then { role: "You", text: .message.content }
           elif (.type == "assistant")
           then (.message.content[]? | select(.type == "text") | { role: "Claude", text: .text })
@@ -147,7 +151,7 @@ case "$cmd" in
       def realuser: select(.isSidechain != true) | select(.type == "user")
         | select(.isMeta != true)
         | select(.message.content | type == "string")
-        | select(.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not);
+        | select(.message.content | test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not);
       def asof: .timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
       (map(select(.timestamp)) | sort_by(.timestamp)) as $t
       | {
@@ -185,7 +189,7 @@ case "$cmd" in
           prompts: ([ .[] | select(.isSidechain != true) | select(.type == "user")
                       | select(.isMeta != true)
                       | select(.message.content | type == "string") | .message.content
-                      | select(test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not)
+                      | select(test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not)
                       | gsub("\\s+"; " ") | gsub("^ +| +$"; "")
                       | select(. != "") | .[0:200] ] | map("- " + .)),
           tools: ([ .[] | select(.isSidechain != true) | select(.type == "assistant")
@@ -194,7 +198,7 @@ case "$cmd" in
                   | map("- `" + .name + "` ×" + (.n | tostring))),
           chat: [ .[] | select(.isSidechain != true)
                   | if (.type == "user" and (.isMeta != true) and (.message.content | type == "string")
-                        and (.message.content | test("^\\s*<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook)") | not))
+                        and (.message.content | test("^\\s*(<(command-message|command-name|task-notification|system-reminder|local-command-stdout|local-command-caveat|bash-input|bash-stdout|user-prompt-submit-hook|teammate-message|agent-message|tool-use-id|task-id)|Another Claude session sent a message:|This session is being continued)") | not))
                     then { role: "You", text: .message.content }
                     elif (.type == "assistant")
                     then (.message.content[]? | select(.type == "text") | { role: "Claude", text: .text })

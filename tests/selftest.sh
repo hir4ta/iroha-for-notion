@@ -66,6 +66,8 @@ hasnt prompts-no-toolresult "FILE WRITTEN" "$prompts"
 hasnt prompts-no-tasknotif "NOISE-TASKNOTIF" "$prompts"
 hasnt prompts-no-caveat "NOISE-CAVEAT" "$prompts"
 hasnt prompts-no-ismeta "NOISE-ISMETA" "$prompts"   # harness meta turn (isMeta) is not a You line
+hasnt prompts-no-teammate "NOISE-TEAMMATE" "$prompts"  # a peer-agent (teammate-message) is not a You turn
+hasnt prompts-no-compact "NOISE-COMPACT" "$prompts"    # an injected compaction summary is not a You turn
 
 echo "=== extract stats (metrics dashboard numbers) ==="
 stats=$(bash "$EXTRACT" stats "$FIX")
@@ -87,6 +89,8 @@ hasnt chat-no-toolresult "FILE WRITTEN" "$chat"
 hasnt chat-no-sidechain "SIDECHAIN" "$chat"
 hasnt chat-no-caveat "NOISE-CAVEAT" "$chat"
 hasnt chat-no-ismeta "NOISE-ISMETA" "$chat"   # harness meta turn (isMeta) excluded from the chat too
+hasnt chat-no-teammate "NOISE-TEAMMATE" "$chat"  # peer-agent (teammate-message) excluded from the chat
+hasnt chat-no-compact "NOISE-COMPACT" "$chat"    # injected compaction summary excluded from the chat
 
 echo "=== extract all (one-pass aggregate — must equal the individual views, no drift) ==="
 all=$(bash "$EXTRACT" all "$FIX")
