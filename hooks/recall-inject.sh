@@ -112,9 +112,8 @@ key=$(printf '%s' "$prompt" | cksum | tr -cd '0-9')
 #    advisory list — never to veto a BM25 hit (that cost real recall; measured). This is the exact
 #    code path tests/hybrid-eval.sh measures, so the eval reflects production. Abstain (exit 0) when
 #    nothing surfaces — an honest silence beats a confident false hit.
-# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
-. "$PR/scripts/_lib/recall.sh"
-hits=$(iroha_recall_local "$root" "$prompt" "${IROHA_RECALL_TOPN:-3}" 2>/dev/null)
+RC="$PR/scripts/_lib/recall.ts"
+hits=$(bun "$RC" "$root" "$prompt" "${IROHA_RECALL_TOPN:-3}" 2>/dev/null)
 [ -z "$hits" ] && exit 0
 
 # 6. Format hits as reference bullets (reconstruct a Notion URL from the bare page id).

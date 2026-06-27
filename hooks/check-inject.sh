@@ -71,9 +71,8 @@ key=$(printf '%s' "$query" | cksum | tr -cd '0-9')
 
 # 6. Cheap local recall over the index; keep only ACTIVE decisions (a Superseded one is not a rule
 #    you can violate). Abstain when nothing clears the floor.
-# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
-. "$PR/scripts/_lib/recall.sh"
-hits=$(iroha_recall_local "$root" "$query" "${IROHA_CHECK_TOPN:-3}" 2>/dev/null \
+RC="$PR/scripts/_lib/recall.ts"
+hits=$(bun "$RC" "$root" "$query" "${IROHA_CHECK_TOPN:-3}" 2>/dev/null \
   | jq -c 'select(.type=="decision" and .status=="Active")' 2>/dev/null)
 [ -z "$hits" ] && exit 0
 

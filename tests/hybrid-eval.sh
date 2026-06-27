@@ -40,8 +40,7 @@ if [ "$rc_e" != 0 ] || [ "$rc_r" != 0 ]; then
   exit 0
 fi
 
-# shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
-. "$PR/scripts/_lib/recall.sh"
+RC="$PR/scripts/_lib/recall.ts"
 
 pos_total=0; pos_hit=0; mrr_sum=0
 abs_total=0; abs_ok=0
@@ -53,7 +52,7 @@ while IFS='|' read -r query expect; do
   # HEAVY = the production heavy path (FORCE_HEAVY=1 exported). FREE = pure BM25, the EXACT free-tier
   # call recall.sh makes. Running both for the same query lets recovery/regression be DERIVED from the
   # data (no hardcoded "which queries are hard" list to drift from golden-recall.txt).
-  heavy_ids=$(iroha_recall_local "$ROOT" "$query" "$K" 2>/dev/null | jq -r 'select(.id)|.id')
+  heavy_ids=$(bun "$RC" "$ROOT" "$query" "$K" 2>/dev/null | jq -r 'select(.id)|.id')
   free_ids=$(bun "$PR/scripts/_lib/search.ts" "$ROOT" "$query" "" "$K" "${IROHA_RECALL_MINSCORE:-1.2}" 2>/dev/null | jq -r 'select(.id)|.id')
   if [ "$expect" = "NONE" ]; then
     abs_total=$((abs_total + 1))
@@ -104,7 +103,7 @@ soft_total=0; soft_quiet=0
 while IFS= read -r q; do
   [ -z "$q" ] && continue
   soft_total=$((soft_total + 1))
-  got=$(iroha_recall_local "$ROOT" "$q" "$K" 2>/dev/null | jq -r 'select(.id)|.title' | head -1)
+  got=$(bun "$RC" "$ROOT" "$q" "$K" 2>/dev/null | jq -r 'select(.id)|.title' | head -1)
   if [ -z "$got" ]; then soft_quiet=$((soft_quiet + 1)); fi
 done <<< "$SOFT_NEG"
 

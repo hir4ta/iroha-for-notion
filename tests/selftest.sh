@@ -386,12 +386,12 @@ fi
 # the promote-not-veto invariant that fixed the silent recall regression of the old veto path.
 echo "=== recall.sh (free tier BM25; heavy-armed-no-model keeps BM25 hits, never drops one) ==="
 RCFREE=$(env IROHA_CONFIG_DIR="$RIDATA3" \
-  bash "$HERE/../scripts/_lib/recall.sh" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
+  bun "$HERE/../scripts/_lib/recall.ts" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
 has recall-free-tier-bm25 "連結: relation でなく URL" "$RCFREE"
 if command -v node >/dev/null 2>&1; then
   RCEMPTY=$(mktemp -d)
   RCHEAVY=$(env IROHA_CONFIG_DIR="$RIDATA3" IROHA_RECALL_FORCE_HEAVY=1 IROHA_MODEL_DIR="$RCEMPTY" \
-    bash "$HERE/../scripts/_lib/recall.sh" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
+    bun "$HERE/../scripts/_lib/recall.ts" "$RIPROJ" "relationプロパティで連結すべきか" 3 2>/dev/null)
   has recall-heavy-no-model-keeps-bm25 "連結: relation でなく URL" "$RCHEAVY"
   rm -rf "$RCEMPTY"
 fi
