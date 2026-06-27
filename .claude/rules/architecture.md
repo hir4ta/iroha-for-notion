@@ -33,7 +33,10 @@
   メタ callout に分け、加えて **linked chart view のダッシュボード**(Sessions 推移/Type・Decisions
   Topic/Status)を載せてデータが溜まるほど可視化される (init が生成＝再 init/配布で再現)。MCP で callout/
   list を挿入する時は **real newline/tab を使う**(`\n`/`\t` の2文字は `nt`/`n` として leak＝State publish
-  と同じ罠)・挿入後は `fetch` で leak を検証。
+  と同じ罠)・挿入後は `fetch` で leak を検証。**Notion に出す prose は発行前に必ず `link-lint.sh` を通す**
+  (backtick 外の裸ファイル名/パス=`extract.sh`/`CLAUDE.md` 等を Notion が `http://…` に自動リンク化する罠を、
+  人間の注意力でなく決定論ゲートで根治＝`state-lint` と同形)。save/init/project/digest の発行点に配線し
+  selftest で守る。
 - **3層メモリ**: Session=各回の出来事 / Decision=なぜ / **Projects (Architecture)=今の技術スタック**
   (言語・lib・CI・mermaid 図、手動更新 `/iroha:project`)。Projects は 1 行=1 プロジェクトの共有 DB、
   `Languages` のみ multi_select、横断検索 (同言語/同 lib の他プロジェクト) に使う。Architecture には

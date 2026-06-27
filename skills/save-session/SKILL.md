@@ -189,6 +189,15 @@ Wrap every file name / command / path in backticks — **including inside callou
 tables** — so Notion does not auto-linkify `.sh` / `.md` names as `http://…` URLs.
 Indent callout / toggle / table children with **tabs**. Keep the returned page URL.
 
+**Lint for auto-linkify BEFORE publishing — deterministic gate, not eyeballing.** Backticking
+by hand recurs as a leak (it has turned `extract.sh` / `CLAUDE.md` in this very page into bogus
+`http://…` links). So before the `notion-create-pages`, write the composed `content` to a temp
+file and run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.sh" <file>`; it lists every bare
+file / command / path token sitting outside a backtick span / code fence / `[text](url)` link.
+Wrap each flagged token in backticks and re-lint until it **exits 0** — never publish content
+link-lint flags. Apply the same gate to **every prose surface** you publish here: the Session
+`content`, the State mirror (step 8), decision page bodies (step 6), and any callout.
+
 Set a clean monochrome page icon:
 `icon: "https://www.notion.so/icons/notebook_gray.svg"`.
 
@@ -401,6 +410,9 @@ STATE
 # never publish a State that fails the lint. Because the mirror and Notion are byte-identical
 # (single source), a clean mirror means a clean Notion page.
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/state-lint.sh" "$MD"
+# Same gate against Notion auto-linkify: a bare file/path in the State body becomes a bogus
+# http://… link. link-lint must also exit 0 before publishing (backtick anything it lists).
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.sh" "$MD"
 ```
 Then publish the **exact same text** (the file you just wrote) to Notion — same headings,
 same links, same lines; do not re-summarize or re-format it:

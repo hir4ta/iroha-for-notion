@@ -164,7 +164,11 @@ API token.
    paragraph.** Use `notion-update-page` `insert_content`, and write content with **real
    newlines / tabs, NEVER the two-character `\n` / `\t` escapes** — they leak into Notion as
    literal `nt` / `n` (the same escape-leak the State publish step warns about; it also bites
-   callouts and lists inserted via MCP). **`fetch` the page afterward to confirm no leak.**
+   callouts and lists inserted via MCP). **`fetch` the page afterward to confirm no leak.** Also
+   run the composed guide/caption text through
+   `bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.sh"` before publishing — it flags bare
+   file/path tokens (`extract.sh` / `CLAUDE.md`) Notion would auto-linkify; backtick them until it
+   exits 0.
 
    **(a) Navigation — a short bold lead line + a bulleted list** (insert at `{"type":"start"}`),
    so a teammate sees "where things are" at a glance (one bullet each; labels below are the

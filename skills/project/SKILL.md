@@ -66,7 +66,9 @@ do not merge them — just connect them.
 **Wrap every file name / command / path in backticks — including inside `<table>` cells,
 callouts, and the `CI` / `DevTools` / `Frameworks` properties** — so Notion does not
 auto-linkify `.sh` / `.md` / `.json` names into bogus `http://…` URLs (a real defect found
-while dogfooding: `selftest.sh` and `CLAUDE.md` rendered as `http://selftest.sh`). Reflect
+while dogfooding: `selftest.sh` and `CLAUDE.md` rendered as `http://selftest.sh`). **Run the
+composed content through `bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.sh"` before
+publishing and backtick anything it flags (it exits non-zero on a bare file/path token).** Reflect
 the **current** stack read in step 2, not a remembered snapshot — re-running this skill is
 how a stale field (e.g. a `CI` that now exists, a recall design that has since changed) gets
 corrected, since `Updated` and the body are fully replaced on each write.

@@ -455,6 +455,22 @@ fi
 eq state-lint-real-mirror "0" "$realmirror"
 rm -rf "$SLDIR"
 
+echo "=== link-lint (Notion auto-linkify guard: bare file/path tokens outside backticks/fences/links) ==="
+LL="$HERE/../scripts/_lib/link-lint.sh"
+# a bare filename in body text is flagged (Notion would auto-linkify it to http://…).
+eq link-lint-bare-fail "1" "$(printf 'save が extract.sh を呼ぶ\n' | bash "$LL" >/dev/null 2>&1; echo $?)"
+has link-lint-names-token "extract.sh" "$(printf 'save が extract.sh を呼ぶ\n' | bash "$LL" 2>&1)"
+# wrapped in backticks -> clean. (SC2016: the literal backticks are test data, no expansion wanted.)
+# shellcheck disable=SC2016
+eq link-lint-backtick-clean "0" "$(printf 'save が `extract.sh` を呼ぶ\n' | bash "$LL" >/dev/null 2>&1; echo $?)"
+# inside a fenced code block -> clean (code is not linkified).
+# shellcheck disable=SC2016
+eq link-lint-fence-clean "0" "$(printf '```\nextract.sh all\n```\nplain\n' | bash "$LL" >/dev/null 2>&1; echo $?)"
+# an explicit [text](url) link -> clean (intentional link, not an accidental one).
+eq link-lint-link-clean "0" "$(printf '[State](https://app.notion.com/p/abc123)\n' | bash "$LL" >/dev/null 2>&1; echo $?)"
+# prose with periods (versions / scores) is NOT a false positive.
+eq link-lint-prose-clean "0" "$(printf 'v0.2.0 をリリース。総合70/100。Node20警告。\n' | bash "$LL" >/dev/null 2>&1; echo $?)"
+
 echo "=== integrity (deterministic substrate self-monitoring: malformed/dup-id/dup-active/State-link) ==="
 # shellcheck disable=SC1091 # dynamic source path; the file exists at runtime
 . "$HERE/../scripts/_lib/integrity.sh"

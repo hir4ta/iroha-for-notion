@@ -69,7 +69,10 @@ Sections, in this order:
    top-down or left-right timeline of the sessions in the window, labeled by date + short topic)
    so the arc of the period is visual.
 
-Wrap every file / command / path in backticks. Indent callout / table / toggle children
+Wrap every file / command / path in backticks, and run the composed content through
+`bash "${CLAUDE_PLUGIN_ROOT}/scripts/_lib/link-lint.sh"` before publishing (it flags bare
+file/path tokens Notion would auto-linkify to `http://…`; backtick them until it exits 0).
+Indent callout / table / toggle children
 with **tabs**.
 
 ## 5. Write the Digest page
