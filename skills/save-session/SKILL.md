@@ -12,6 +12,10 @@ decisions, rules, classification, chat highlights); `scripts/extract.ts` produce
 deterministic parts (files, commands, metadata). All Notion writes go through the
 connected Notion MCP. Write Notion content in the **user's conversation language**.
 
+> The *why* behind a couple of these steps (why the index is keys + a snippet, why State is
+> single-source) lives in [`reference/rationale.md`](reference/rationale.md). This file is the
+> executable procedure — every step and inline warning you need at save time is here.
+
 ## 1. Preconditions
 
 Confirm Notion MCP is connected, then load the cached ids:
@@ -325,15 +329,11 @@ bun "$IDX" upsert "$ROOT" decision "<decision_page_id>" "<topic>" Active "<YYYY-
 bun "$IDX" upsert "$ROOT" decision "<old_page_id>" "<topic>" Superseded "<old_date>" "<old_Name>" "<Project>" "<old rationale snippet>"
 ```
 
-The index holds **keys + a derived search snippet** (topic / status / id / a short rationale
-condensation) — NOT the canonical content: Notion stays the single source of truth, and recall
-fetches the full `Rationale` / `Alternatives` from there. The snippet is regenerated on every
-save (like an embedding would be), so it cannot drift into a second truth. It exists so (a)
-dedup / supersede / audit can enumerate the **complete** set free-plan search cannot, and (b)
-the local BM25 recall (`search.ts`, the cheap always-on first stage in the UserPromptSubmit
-hook) can match a prompt against the *reason* a decision was made — not just its title (matching
-the title alone misses "do we need an API token?" → "Notion: MCP only", whose reason is the
-token, not the title).
+The index holds **keys + a derived search snippet** (a `≤160`-char rationale condensation) — NOT
+the canonical content: Notion stays the single source of truth, and recall fetches the full
+`Rationale` / `Alternatives` from there. The snippet is regenerated every save, so it cannot drift
+into a second truth. (Why a derived snippet and not the content — its two jobs for dedup/audit and
+the local BM25 recall — is in [`reference/rationale.md`](reference/rationale.md).)
 
 ## 7. Chat highlights — curated, anchored to real messages
 
@@ -365,9 +365,8 @@ re-listing them here only duplicates the latest Session row).
 **Single source — compose the State body ONCE, write that *identical* text to both the repo
 mirror and Notion.** The mirror (`<repo>/.iroha/state.md`, what the offline SessionStart hook
 injects) and the Notion State page (what humans open) are the **same artifact**; authoring it
-twice is what lets them drift. (A past save composed them separately and the Notion page ended
-up degraded — only a summary callout, with literal `\n`/`\t` escapes leaking in as `nt…n`,
-while the mirror was fine. The rule below makes that impossible.)
+twice is what lets them drift. (The dogfood failure that motivated this single-source rule is in
+[`reference/rationale.md`](reference/rationale.md).)
 
 **State body = plain Notion Markdown** (monochrome, no emoji, **no nested callouts** — plain
 `##` headings + `-` lists render cleanly in Notion *and* stay byte-identical to the mirror).
