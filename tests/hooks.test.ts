@@ -70,6 +70,9 @@ function ri(
       CLAUDE_PLUGIN_ROOT: ROOT,
       IROHA_CONFIG_DIR: cfg,
       TMPDIR: RICACHE,
+      // The fixture index has ONE row, on purpose, to test inject MECHANICS (shape/cache/gates).
+      // Pin the cold-start corpus gate off so those are independent of it; the gate has its own test.
+      IROHA_RECALL_MIN_CORPUS: "1",
       ...extraEnv,
     },
   });
@@ -210,9 +213,27 @@ test("recall-inject — selfcheck (offline readiness probe)", () => {
 test("recall.ts — returns the BM25 advisory hit", () => {
   const r = run(
     ["bun", RECALL, RIPROJ, "relationプロパティで連結すべきか", "3"],
-    { env: { IROHA_CONFIG_DIR: RIDATA3 } },
+    { env: { IROHA_CONFIG_DIR: RIDATA3, IROHA_RECALL_MIN_CORPUS: "1" } },
   );
   expect(r.out).toContain("連結: relation でなく URL");
+});
+
+// ── cold-start corpus gate (recall.ts): below the threshold the proactive tier stays silent ────────
+test("recall — cold-start corpus gate suppresses on a too-small index", () => {
+  // Same one-row index + a query that DOES match — but a threshold above the row count.
+  const r = run(
+    ["bun", RECALL, RIPROJ, "relationプロパティで連結すべきか", "3"],
+    {
+      env: { IROHA_CONFIG_DIR: RIDATA3, IROHA_RECALL_MIN_CORPUS: "5" },
+    },
+  );
+  expect(r.out).toBe(""); // gated: 1 row < 5 -> no hit, even though the query matches
+  // The hook honors the same gate: no injection on a sub-threshold corpus.
+  expect(
+    ri("relationプロパティで連結すべきか検討したい", "sidGate", {
+      IROHA_RECALL_MIN_CORPUS: "5",
+    }).out,
+  ).toBe("");
 });
 
 // ── check-inject hook (write-time decision advisory: gate / consent / abstain / inject) ──────────
@@ -233,6 +254,7 @@ function ci(
       CLAUDE_PLUGIN_ROOT: ROOT,
       IROHA_CONFIG_DIR: cfg,
       TMPDIR: RICACHE,
+      IROHA_RECALL_MIN_CORPUS: "1", // see ri(): one-row fixture, gate tested separately
       ...extraEnv,
     },
   });

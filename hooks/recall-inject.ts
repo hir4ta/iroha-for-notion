@@ -11,8 +11,10 @@
 //   - Gate:     trivial / ack / slash-command / system-pseudo-prompt turns are skipped.
 //   - Consent:  off unless /iroha:init set recall_enabled=true (a fresh install costs nothing).
 //   - Cache:    one recall per identical prompt per session.
+//   - Cold-start: a corpus too small for BM25 IDF to be trustworthy -> nothing injected (recall.ts).
 //   - Abstain:  nothing clears the relevance floor (or no index) -> nothing injected.
-// Tunables: IROHA_RECALL_MINSCORE (relevance floor, default 1.2), IROHA_RECALL_TOPN (default 3).
+// Tunables: IROHA_RECALL_MINSCORE (relevance floor, default 1.2), IROHA_RECALL_TOPN (default 3),
+//   IROHA_RECALL_MIN_CORPUS (cold-start corpus gate, default 8; 1 = effectively off).
 // stdout is reserved for the hook JSON; all diagnostics are silence.
 
 import { createHash } from "node:crypto";
