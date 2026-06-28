@@ -1,13 +1,17 @@
 // recall-eval.ts — quality oracle for the local recall stage (scripts/_lib/search.ts).
 //
 // selftest proves the search MECHANICS (tokenization, status weight, abstention) on synthetic
-// fixtures. This proves the search QUALITY on the project's REAL index: a hand-labeled golden set
-// of realistic developer prompts paired with the decision/session they should surface, plus
-// abstention prompts that must surface nothing. It reports Recall@k, MRR, and abstention accuracy,
-// and exits non-zero if they fall below threshold.
+// fixtures. This proves the search QUALITY on a frozen snapshot of a real index: a hand-labeled
+// golden set of realistic developer prompts paired with the decision/session they should surface,
+// plus abstention prompts that must surface nothing. It reports Recall@k, MRR, and abstention
+// accuracy, and exits non-zero if they fall below threshold.
 //
-// It runs against <root>/.iroha/index.ndjson (default: this repo). Re-label the golden set when
-// the index changes materially. Run: bun tests/recall-eval.ts; echo $?   (0 = thresholds met)
+// It runs against a FROZEN fixture corpus (tests/fixtures/recall-corpus/.iroha/index.ndjson), NOT
+// the live repo index — so a workspace re-save / re-init churning decision ids never breaks CI (that
+// drift red-failed CI three times). The fixture is a snapshot of a real index; regenerate it
+// DELIBERATELY (`cp .iroha/index.ndjson tests/fixtures/recall-corpus/.iroha/`) and re-label the
+// golden only when you actually want to change the test corpus, never as forced re-save fallout.
+// Pass an explicit <root> arg to eval a different index ad-hoc. Run: bun tests/recall-eval.ts; echo $?
 //
 // KNOWN LIMITATION (abstention is scoped, not absolute). The negatives here are CROSS-DOMAIN
 // (different language AND topic), which a pure-lexical pass abstains on cleanly. An off-topic prompt
@@ -21,7 +25,8 @@ import { search } from "../scripts/_lib/search.ts";
 
 const out = (s: string) => process.stdout.write(`${s}\n`);
 
-const ROOT = process.argv[2] ?? join(import.meta.dir, "..");
+const ROOT =
+  process.argv[2] ?? join(import.meta.dir, "fixtures", "recall-corpus");
 const K = 3; // Recall@K — how many hits the hook would surface
 const MINSCORE = Number(process.env.IROHA_RECALL_MINSCORE ?? "1.2"); // production floor
 const RECALL_THRESHOLD = 80; // require Recall@K >= 80%

@@ -24,7 +24,11 @@ import { rerankPromote } from "../scripts/rerank.ts";
 
 const out = (s: string) => process.stdout.write(`${s}\n`);
 
-const ROOT = process.env.IROHA_EVAL_ROOT ?? join(import.meta.dir, "..");
+// Default to the FROZEN fixture corpus (shared with recall-eval), NOT the live repo index, so a
+// workspace re-save never churns the golden ids. Override with IROHA_EVAL_ROOT for an ad-hoc index.
+const ROOT =
+  process.env.IROHA_EVAL_ROOT ??
+  join(import.meta.dir, "fixtures", "recall-corpus");
 const GOLDEN_FILE = join(import.meta.dir, "golden-recall.txt");
 const K = 3;
 const MINSCORE = Number(process.env.IROHA_RECALL_MINSCORE ?? "1.2");

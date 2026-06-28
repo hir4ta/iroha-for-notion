@@ -21,7 +21,10 @@ import { rerankPromote } from "../scripts/rerank.ts";
 
 const out = (s: string) => process.stdout.write(`${s}\n`);
 
-const ROOT = join(import.meta.dir, "..");
+// Frozen fixture corpus (shared with recall-eval / hybrid-eval), NOT the live repo index — a
+// workspace re-save churns decision ids and used to drift this eval's TRUEQ labels. The snapshot
+// keeps them stable; re-label only when the fixture is deliberately regenerated.
+const ROOT = join(import.meta.dir, "fixtures", "recall-corpus");
 const INDEX = join(ROOT, ".iroha", "index.ndjson");
 const THRESHOLD = process.env.IROHA_RERANK_THRESHOLD ?? "0.05";
 // rerankPromote reads IROHA_MODEL_DIR from the env; pin it (default per-user dir) before calling.
@@ -66,18 +69,16 @@ async function rerank(query: string): Promise<string[]> {
 }
 
 // TRUE prompts -> a substring the surfaced decision's topic/title must contain. ONE near-paraphrase
-// per decision that ACTUALLY exists in the re-based index. The workspace was cleared + re-init'd,
-// leaving 3 decisions (ランタイム / 検索lib / 構造検証); the prior labels pointed at decisions that no
-// longer exist, which is why this eval read 0/5 (every TRUE query missed a phantom topic). Each query
-// is a paraphrase the cross-encoder ranks #1 above the 0.05 promote threshold (measured 0.94/0.99/0.98
-// against the current corpus). Re-label / extend this list as the decision corpus grows.
+// per decision in the frozen fixture corpus (HEAVY実行 / 依存方針 / 保存). Each query is a paraphrase
+// the cross-encoder ranks above the 0.05 promote threshold against that corpus. Re-label only when the
+// fixture is deliberately regenerated (never as forced re-save fallout — that drift is now designed out).
 const TRUEQ: [string, string][] = [
   [
-    "ランタイムは Bun と TypeScript にすべきか pure bash から移行",
-    "ランタイム",
+    "transformers を node サブプロセスでなく Bun で in-process 実行する",
+    "HEAVY実行",
   ],
-  ["検索ライブラリは自前実装を維持すべきか外部 lib に置換すべきか", "検索lib"],
-  ["Session 本文の構造を保存前に session-lint で検証すべきか", "構造検証"],
+  ["外部ライブラリを足さず依存ゼロを維持すべきか", "依存方針"],
+  ["Notion 保存で API トークンを使わず本文を決定論で生成すべきか", "保存"],
 ];
 // HARD-NEGATIVE prompts (off-topic but share the project's vocabulary) -> MUST inject nothing.
 const NEGQ = [
