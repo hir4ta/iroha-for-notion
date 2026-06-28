@@ -80,6 +80,7 @@ API token.
    ```
    parent: {"type":"page_id","page_id":"<PAGE_ID>"}   title: "Decisions"
    schema: CREATE TABLE ("Name" TITLE, "Project" SELECT('iroha-for-session':blue), "Topic" SELECT('general':gray), "Status" SELECT('Active':green, 'Superseded':gray), "Tags" MULTI_SELECT('architecture':blue, 'dependency':orange, 'process':gray), "Rationale" RICH_TEXT, "Alternatives" RICH_TEXT, "Session" URL, "Supersedes" URL, "Date" DATE)
+   ```
 
    `Topic` is a first-class **SELECT** (the `<topic>` half of the `<topic>: <choice>` Name):
    it makes the decision's topic a real, filterable/groupable property instead of a string
@@ -88,7 +89,6 @@ API token.
    ALTERs a new topic's option in on first use (see save-session 5.0 / 6). `Supersedes` (URL) is
    the lineage edge to the decision this one replaced (relation-free, same URL-linking as
    `Session`); it is required for `/iroha:history` and the `integrity` lineage check.
-   ```
 
    Projects (one row per project — the cross-project architecture layer for catch-up
    and "how do our other <language> projects do this?"):
@@ -212,7 +212,8 @@ API token.
       of relevant past decisions (disable with `IROHA_RECALL_DISABLE=1`; check readiness with
       `bun "${CLAUDE_PLUGIN_ROOT}/hooks/recall-inject.ts" --selfcheck`). It is a dependency-free TS
       BM25 over the local index — zero deps, instant, offline. For deeper, semantic lookups the user
-      runs `/iroha:recall <topic>` (Notion's own semantic search, free plan); no local models to install.
+      runs `/iroha:recall <topic>` (Notion's own semantic search — on a free workspace, scoped to your
+      own pages, which is all iroha needs); no local models to install.
 
 ## Notes
 

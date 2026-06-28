@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Search this project's iroha memory — past decisions ("did we decide against X? why?") and similar past work ("have we built something like this before?"). Uses Notion semantic search (works on the free plan) over the Sessions and Decisions databases. Triggers on "/iroha:recall", and naturally when the user asks "did we decide X?", "why did we choose X?", or "have we built something like this before?".
+description: Search this project's iroha memory — past decisions ("did we decide against X? why?") and similar past work ("have we built something like this before?"). Uses Notion's own search (notion-search) over the Sessions and Decisions databases; on a free Notion workspace it is scoped to your own pages, which is all this needs. Triggers on "/iroha:recall", and naturally when the user asks "did we decide X?", "why did we choose X?", or "have we built something like this before?".
 argument-hint: "[query]"
 context: fork
 ---
@@ -15,9 +15,10 @@ LLM-quality second stage — the cheap always-on first stage stays the dependenc
 
 Pull relevant memory from iroha so you reuse past decisions and prior work instead of
 re-deciding or re-building from scratch — the core of a living, **growing team
-memory**. Notion is the **single source of truth**, and `notion-search` works on the
-**free** plan (`workspace_search`), so recall reads canonical, always-current team data
-directly — there is no local copy to drift.
+memory**. Notion is the **single source of truth**, and `notion-search` (`workspace_search`) runs
+on a **free** Notion workspace **scoped to your own pages** — which is exactly what recall needs
+(it never searches connected third-party apps; full semantic ranking may require Notion AI). So
+recall reads canonical, always-current team data directly — there is no local copy to drift.
 
 ## 1. Load the data source ids
 

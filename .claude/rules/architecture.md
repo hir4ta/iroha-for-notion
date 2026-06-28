@@ -52,7 +52,8 @@
   段の仕事。同一語彙の偽陽性 leak は固有限界として許容し floor は上げない・**coverage gate も入れない**
   (どちらも**単一強語マッチの実 recall を犠牲**にし recall-sacrosanct に反する: coverage≥2 は selftest の
   `oauth flow`→`s1`=doc が `oauth` のみ含む単一トークン正答を落とすことで実証済)。②深い**semantic 後段**=
-  `/iroha:recall` が `notion-search`(無料で動く)で言い換えも拾い、`notion-fetch` で Rationale/Alternatives/
+  `/iroha:recall` が `notion-search`(無料 workspace で自分のページに scoped＝iroha が要るのはこれだけ。完全な
+  semantic ランクは Notion AI が要る場合あり)で言い換えも拾い、`notion-fetch` で Rationale/Alternatives/
   変更ファイルまで合成する。**この後段は `context: fork` の subagent** で走らせ、大量の中間読み(複数 DB の
   notion-search・本文の notion-fetch・index 列挙)でメイン文脈を汚さず curated な答えだけ返す。前段で足りる時は
   後段を起動しない(コスト/遅延ゼロ)。index 全件列挙(`query-data-sources` が有料＝列挙不能を補完)で dedup・

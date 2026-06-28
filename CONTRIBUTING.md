@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in iroha for Notion. It's a small Claude Code plugin
+Thanks for your interest in iroha-for-session. It's a small Claude Code plugin
 (Bun + TypeScript) — easy to run locally.
 
 ## Dev setup

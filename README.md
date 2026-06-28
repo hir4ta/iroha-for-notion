@@ -33,7 +33,8 @@ changed, and why.
   BM25 search (`search.ts`, CJK-aware, **no LLM and no network**) over a tiny on-disk index and
   proactively surfaces the most relevant past decisions — so Claude consults them *before*
   rebuilding, at zero per-prompt latency or token cost. When that pointer isn't enough,
-  `/iroha:recall` escalates to Notion **semantic** search (`notion-search`, free plan) for the
+  `/iroha:recall` escalates to Notion's own **semantic** search (`notion-search`; on a free
+  workspace it is scoped to your own pages — all iroha needs — full ranking may want Notion AI) for the
   full rationale and rejected alternatives. The local BM25 is the always-on proactive net at zero
   cost; the semantic stage is Notion's own search (no local models) — so recall stays dependency-free
   with nothing to install, and the deep `/iroha:recall` runs as a forked subagent to keep its bulky
@@ -76,7 +77,13 @@ graph TD
 ## Requirements
 
 - [Claude Code](https://code.claude.com/docs)
-- A Notion account with the **hosted Notion MCP** connected (OAuth). Works on the **free** plan.
+- **[Bun](https://bun.sh) ≥ 1.1** — the runtime for iroha's hooks and skills. Claude Code does
+  **not** bundle it, so install it first (`curl -fsSL https://bun.sh/install | bash`) and check
+  `bun --version`. Without Bun every hook and skill fails with `bun: command not found`.
+- A Notion account with the **hosted Notion MCP** connected (OAuth). Works on the **free** plan:
+  the always-on proactive recall and your project State are fully **local** (no Notion, no Notion
+  AI). The deep `/iroha:recall` uses Notion's own search — on a free workspace it is scoped to your
+  own pages (which is all iroha needs); full semantic ranking may require Notion AI.
 
 ## Install
 
