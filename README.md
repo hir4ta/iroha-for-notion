@@ -14,12 +14,15 @@
 
 ## Why
 
-Claude Code's built-in memory is thin and lives on one machine. iroha turns each coding
-session into structured, searchable memory in Notion, so that the next session — yours
-or a teammate's — opens already knowing the project's decisions, its unfinished work,
-and how it is built. The more the team uses it, the more it grows: ask *"have we built
-something like this before?"* and iroha points at the prior session, the files it
-changed, and why.
+Claude Code now ships its own memory — but it lives on **one developer's disk** and is
+written for the agent to read back, not for a team to browse. iroha is the layer **on top**:
+it turns each session into a **team-shared, human-browsable** record in Notion — a decision
+ledger with the *rationale and the rejected alternatives*, a supersede history (a change of
+mind is itself memory), work-state, and per-project architecture. So the next session — yours
+or a teammate's — and any human opening Notion can see what was decided, *why*, what was ruled
+out, what's unfinished, and how things are built. The more the team uses it, the more it grows:
+ask *"have we built something like this before?"* and iroha points at the prior session, the
+files it changed, and why.
 
 ## How it works
 
@@ -38,7 +41,9 @@ changed, and why.
   full rationale and rejected alternatives. The local BM25 is the always-on proactive net at zero
   cost; the semantic stage is Notion's own search (no local models) — so recall stays dependency-free
   with nothing to install, and the deep `/iroha:recall` runs as a forked subagent to keep its bulky
-  lookups out of the main context.
+  lookups out of the main context. On a brand-new project the proactive net stays **quiet** until
+  the memory has grown enough for the ranking to be trustworthy (a cold-start gate) — better silence
+  than a confident-but-coincidental match.
 - A SessionStart hook injects the project's **State** (from a small repo mirror) so
   Claude proactively tells you where you left off and what's unfinished. After `/compact`
   or auto-compact it also **re-injects the current session's own thread** (your prompts +
@@ -110,6 +115,7 @@ In Claude Code:
 | --- | --- |
 | `/iroha:init` | One-time setup (idempotent): create or join the Notion databases + views. |
 | `/iroha:save-session` | Save this session: summary, decisions, rules changed, work-state, highlights, changed files. |
+| `/iroha:decide "<topic>: <choice>"` | Record one decision (rationale + rejected alternatives) the moment you make it — the lightweight capture that grows the ledger between full saves. |
 | `/iroha:recall <query>` | Semantic search over Sessions + Decisions for past decisions and similar prior work. |
 | `/iroha:history <topic>` | Walk a decision's supersede lineage — how and why the choice evolved (`v3 ← v2 ← v1`), with the reason at each step. Read-only. |
 | `/iroha:project` | Capture/update this project's architecture profile (manual). |

@@ -44,6 +44,12 @@
   (言語・lib・CI・mermaid 図、手動更新 `/iroha:project`)。Projects は 1 行=1 プロジェクトの共有 DB、
   `Languages` のみ multi_select、横断検索 (同言語/同 lib の他プロジェクト) に使う。Architecture には
   「なぜ」を書かず Decisions へリンク。
+- **capture は 2 経路** (Decision 行を作る正本は同一)。①重い `/iroha:save-session` = 各回の全記録
+  (chat/metrics/highlights/State carry-over ＋ その回の Decision 群)。②軽量 `/iroha:decide` = 決定 1 件を
+  その場で 1 行 1 write (理由＋却下案、Topic/Project の SELECT ensure・dedup/supersede・index upsert は
+  save §5.0/§6 の部分集合)。**Session 行も State も触らない** (=決定台帳だけを育てる)。北極星「育つ記憶」は
+  full save の頻度に依存しない: 決定の瞬間に台帳が伸びる。save と decide が作る Decision 行のスキーマ・
+  dedup 規律・index 形式は同一 (二経路で別物を作らない)。
 - **リコールは2段だがローカルにモデルを持たない**。①常時の**安価ローカル前段**=
   `scripts/_lib/recall.ts :: recallLocal` = `search.ts` の自前 **BM25**(TS・CJK 2-gram トークナイズ・
   status/type 重み・英語機能語ストップワード除去=recall 中立で romaji 識別子 `iroha-for-session` 由来の
@@ -51,7 +57,14 @@
   UserPromptSubmit hook が毎プロンプト proactively に注入する。precision は意図的に deferred=後段の semantic
   段の仕事。同一語彙の偽陽性 leak は固有限界として許容し floor は上げない・**coverage gate も入れない**
   (どちらも**単一強語マッチの実 recall を犠牲**にし recall-sacrosanct に反する: coverage≥2 は selftest の
-  `oauth flow`→`s1`=doc が `oauth` のみ含む単一トークン正答を落とすことで実証済)。②深い**semantic 後段**=
+  `oauth flow`→`s1`=doc が `oauth` のみ含む単一トークン正答を落とすことで実証済)。**ただし cold-start の
+  コーパスサイズ gate は別物として許可する** (`recallLocal`、既定 `IROHA_RECALL_MIN_CORPUS=8`、1=実質 off):
+  index 行数が閾値未満の間だけ前段 tier 全体を黙らせる。これは floor 引き上げでも per-query coverage gate でも
+  ない (どちらも**十分なコーパスでも**実 recall を恒久的に削る) — 極小コーパスでは BM25 IDF が誤較正で
+  「実マッチ ~0.96<floor=MISS / 無関係マッチ ~5.5=誤注入」(5 行で実測) になるため、IDF が信号と偶然を分離できる
+  大きさに**育つまで**沈黙する方が「自信ありげな偶然一致」より良い。コーパスが育てば**自動解除**され (内部の
+  per-query スコアリングには一切触らない)、`/iroha:decide` がその成長を速める。明示 `/iroha:recall` は
+  コーパスサイズに関わらず常に動く。②深い**semantic 後段**=
   `/iroha:recall` が `notion-search`(無料 workspace で自分のページに scoped＝iroha が要るのはこれだけ。完全な
   semantic ランクは Notion AI が要る場合あり)で言い換えも拾い、`notion-fetch` で Rationale/Alternatives/
   変更ファイルまで合成する。**この後段は `context: fork` の subagent** で走らせ、大量の中間読み(複数 DB の
