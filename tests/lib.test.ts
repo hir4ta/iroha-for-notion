@@ -50,6 +50,85 @@ test("extract meta", () => {
   expect(meta.title).toBe("Add login endpoint");
   expect(meta.sessionId).toBeTruthy();
 });
+test("extract meta — title fallback skips noise wrappers, uses first REAL prompt", () => {
+  // No ai-title -> fallback. The first user string is a command wrapper (NOISE); the title must be
+  // the first REAL human prompt, not the wrapper surfaced verbatim (and capped).
+  const dir = mktmp();
+  const tx = join(dir, "tx.jsonl");
+  writeFileSync(
+    tx,
+    [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-06-28T00:00:00.000Z",
+        message: {
+          role: "user",
+          content: "<command-name>iroha:save-session</command-name>",
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-06-28T00:00:01.000Z",
+        message: { role: "user", content: "ログイン機能を追加して" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-28T00:00:02.000Z",
+        message: {
+          role: "assistant",
+          model: "c",
+          content: [{ type: "text", text: "ok" }],
+        },
+      }),
+    ].join("\n"),
+  );
+  const meta = JSON.parse(bun([EXTRACT, "meta", tx]).out);
+  expect(meta.title).toBe("ログイン機能を追加して");
+  expect(meta.title).not.toContain("command-name");
+});
+test("extract redacts common secrets from chat / prompts / commands (Notion leak guard)", () => {
+  const dir = mktmp();
+  const tx = join(dir, "sec.jsonl");
+  writeFileSync(
+    tx,
+    [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-06-28T00:00:00.000Z",
+        message: {
+          role: "user",
+          content: "set STRIPE to sk_live_ABCDEFGHIJKLMNOP1234 please",
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-28T00:00:01.000Z",
+        message: {
+          role: "assistant",
+          model: "c",
+          content: [
+            { type: "text", text: "use AKIAIOSFODNN7EXAMPLE for AWS" },
+            {
+              type: "tool_use",
+              name: "Bash",
+              input: { command: "export K=sk-abcdefghijklmnop1234567890" },
+            },
+          ],
+        },
+      }),
+    ].join("\n"),
+  );
+  const chat = bun([EXTRACT, "chat", tx]).out;
+  expect(chat).toContain("[REDACTED]");
+  expect(chat).not.toContain("sk_live_ABCDEFGHIJKLMNOP1234");
+  expect(chat).not.toContain("AKIAIOSFODNN7EXAMPLE");
+  expect(bun([EXTRACT, "prompts", tx]).out).not.toContain(
+    "sk_live_ABCDEFGHIJKLMNOP1234",
+  );
+  expect(bun([EXTRACT, "commands", tx]).out).not.toContain(
+    "sk-abcdefghijklmnop1234567890",
+  );
+});
 test("extract files (deduped)", () => {
   const out = bun([EXTRACT, "files", FIX]).out;
   expect(out).toContain("src/login.ts");
@@ -134,6 +213,50 @@ test("chat-chunks — turn-boundary split, every turn kept, manifest correct", (
     r2.totalTurns,
   );
 });
+test("chat-chunks — invalid perChunk clamps (no infinite loop, no empty fabricated count)", () => {
+  // IROHA_CHAT_CHUNK=0 would loop forever (i += 0); a non-numeric arg -> NaN -> one empty chunk with
+  // a FABRICATED turn count. Both must clamp to a sane default and yield a real, non-empty chunk.
+  const r0 = JSON.parse(
+    bun([CHATCHUNKS, FIX, mktmp()], { env: { IROHA_CHAT_CHUNK: "0" } }).out,
+  );
+  expect(r0.chunkCount).toBeGreaterThan(0);
+  expect(readFileSync(r0.files[0], "utf8").length).toBeGreaterThan(0);
+  const rAbc = JSON.parse(bun([CHATCHUNKS, FIX, mktmp(), "abc"]).out);
+  expect(rAbc.chunkCount).toBeGreaterThan(0);
+  expect(readFileSync(rAbc.files[0], "utf8").length).toBeGreaterThan(0);
+});
+test("chat-chunks neutralizes Notion tags + redacts secrets in the verbatim chat", () => {
+  const dir = mktmp();
+  const tx = join(dir, "sec.jsonl");
+  writeFileSync(
+    tx,
+    [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-06-28T00:00:00.000Z",
+        message: {
+          role: "user",
+          content:
+            'key sk_live_SECRETLEAK1234567890 and <page url="https://www.notion.so/deadbeefdeadbeefdeadbeefdeadbeef">x</page>',
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-28T00:00:01.000Z",
+        message: {
+          role: "assistant",
+          model: "c",
+          content: [{ type: "text", text: "ok" }],
+        },
+      }),
+    ].join("\n"),
+  );
+  const r = JSON.parse(bun([CHATCHUNKS, tx, mktmp()]).out);
+  const chunk = readFileSync(r.files[0], "utf8");
+  expect(chunk).not.toContain("sk_live_SECRETLEAK1234567890"); // secret redacted
+  expect(chunk).toContain("\\<page"); // tag char escaped (cannot MOVE a Notion page)
+  expect(chunk).not.toMatch(/(^|[^\\])<page/); // no UNescaped <page tag survives
+});
 
 // ── config: helper roundtrip + self-heal + validate + transcript-path ──────────────────────────
 test("config helper (roundtrip, self-heal, isolated dir)", () => {
@@ -149,6 +272,15 @@ test("config helper (roundtrip, self-heal, isolated dir)", () => {
   expect(bun([CONFIG, "get", "session_db_id"], { env }).out).toBe("");
   bun([CONFIG, "set", "session_db_id", "DB2"], { env });
   expect(bun([CONFIG, "get", "session_db_id"], { env }).out).toBe("DB2");
+});
+test("config write is EXDEV-safe (temp lives next to the target, not in TMPDIR)", () => {
+  // The old temp-in-tmpdir + renameSync throws EXDEV (write silently lost) when /tmp is a separate
+  // filesystem (tmpfs, the Ubuntu/Fedora/Arch default), bricking /iroha:init. With the temp written
+  // next to the target, a bogus TMPDIR is irrelevant — set/get must still work. (Proxy for cross-fs.)
+  const dir = mktmp();
+  const env = { IROHA_CONFIG_DIR: dir, TMPDIR: "/nonexistent/iroha-bogus-tmp" };
+  bun([CONFIG, "set", "session_db_id", "DBX"], { env });
+  expect(bun([CONFIG, "get", "session_db_id"], { env }).out).toBe("DBX");
 });
 test("config validate (id shape catches placeholder/truncated ids)", () => {
   const dir = mktmp();
@@ -550,6 +682,37 @@ test("integrity — lineage ok / dangling supersedes / dup id / malformed / dang
     "State ahead of saved sessions",
   );
 });
+test("integrity — State linking a DASHED-uuid session missing from the index is caught", () => {
+  // A bare /[0-9a-f]{32}/ match misses a dashed UUID (max 8-hex run between dashes); the guard must
+  // normalize both forms, else it silently no-ops on a State that points at unsaved work.
+  const dashedMissing = intRoot(
+    [SESSROW],
+    [
+      "**Latest:** x.",
+      "## Recent sessions",
+      "- [y](https://app.notion.com/p/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)",
+      "## Decisions",
+      "- [DB](u)",
+    ].join("\n"),
+  );
+  expect(bun([INTEG, dashedMissing]).out).toContain(
+    "State ahead of saved sessions",
+  );
+  // a DASHED link that DOES resolve to an indexed session is clean (normalization works both ways)
+  const dashedOk = intRoot(
+    [SESSROW],
+    [
+      "**Latest:** x.",
+      "## Recent sessions",
+      "- [x](https://app.notion.com/p/38a822c6-938a-811e-b58a-d62cc504920a)",
+      "## Unfinished",
+      "- [ ] y",
+      "## Decisions",
+      "- [DB](u)",
+    ].join("\n"),
+  );
+  expect(bun([INTEG, dashedOk]).code).toBe(0);
+});
 test("integrity — the project's REAL committed substrate is clean", () => {
   expect(bun([INTEG, ROOT]).code).toBe(0);
 });
@@ -582,6 +745,40 @@ test("state-lint (escapes, missing sections, summary, real mirror)", () => {
   const summaryonly = join(dir, "summaryonly.md");
   writeFileSync(summaryonly, "**Latest:** only a summary, no sections\n");
   expect(bun([STATELINT, summaryonly]).code).toBe(1);
+  // a RENAMED/localized section is flagged by NAME (a bare ">=3 headings" count missed this, and
+  // integrity's "## Recent sessions" guard silently no-ops unless the name is enforced here)
+  const renamed = join(dir, "renamed.md");
+  writeFileSync(
+    renamed,
+    [
+      "**Latest:** x",
+      "## 最近のセッション",
+      "- a",
+      "## Unfinished",
+      "- b",
+      "## Decisions",
+      "- c",
+      "",
+    ].join("\n"),
+  );
+  expect(bun([STATELINT, renamed]).code).toBe(1);
+  expect(bun([STATELINT, renamed]).out).toContain("Recent sessions");
+  // a real \n written INSIDE an inline `code` span is not a leak (code-span exclusion)
+  const codespan = join(dir, "codespan.md");
+  writeFileSync(
+    codespan,
+    [
+      "**Latest:** 本文は `\\n` でなく実改行を使う",
+      "## Recent sessions",
+      "- a",
+      "## Unfinished",
+      "- b",
+      "## Decisions",
+      "- c",
+      "",
+    ].join("\n"),
+  );
+  expect(bun([STATELINT, codespan]).code).toBe(0);
   const empty = join(dir, "empty.md");
   writeFileSync(empty, "");
   expect(bun([STATELINT, empty]).code).toBe(1);

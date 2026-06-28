@@ -11,13 +11,36 @@
 //
 // Checks are LANGUAGE-INDEPENDENT (structure only — no dependence on translated heading text):
 //   1. non-empty file.
-//   2. no literal "\n" / "\t" two-character escape sequences — the body must contain REAL
-//      newlines/tabs; the escaped form is exactly the leak that degraded a past State.
-//   3. >= 3 "## " section headings — a State that degraded to a summary-only callout loses the
-//      Recent-sessions / Unfinished / Decisions sections it exists to provide.
+//   2. no literal "\n" / "\t" two-character escape sequence OUTSIDE code — body must contain REAL
+//      newlines/tabs (the leak that degraded a past State). Fenced/inline `code` is excluded first
+//      (like link-lint / session-lint) so a legitimate \n / \t written inside `code` is not flagged.
+//   3. the REQUIRED named "## " sections are present: Recent sessions / Unfinished / Decisions. (A
+//      bare count missed a State that degraded to a summary AND a State whose section was renamed —
+//      and integrity's State->index guard keys on the literal "## Recent sessions" heading, so the
+//      name must be enforced here or that guard silently no-ops on a localized/renamed heading.)
 //   4. a summary line before the first "## " heading (the "**Latest (...)**" one-liner).
 
 import { existsSync, readFileSync, statSync } from "node:fs";
+
+// The "## " sections save-session §8 writes every save — English canonical (the body lines localize,
+// the headings do not), matched by name so the structure can't silently drift.
+const REQUIRED_SECTIONS = ["Recent sessions", "Unfinished", "Decisions"];
+
+// Drop fenced code blocks and strip inline `code` spans before the \n / \t leak check (link-lint's
+// exclusion), so a real \n / \t inside `code` is not a false positive.
+function stripCode(md: string): string {
+  let inFence = false;
+  const out: string[] = [];
+  for (const raw of md.split("\n")) {
+    if (/^[ \t]*```/.test(raw)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    out.push(raw.replace(/`[^`]*`/g, ""));
+  }
+  return out.join("\n");
+}
 
 // stateLint(file) -> issue strings (empty list = clean).
 export function stateLint(file: string): string[] {
@@ -27,16 +50,19 @@ export function stateLint(file: string): string[] {
   }
   const body = readFileSync(file, "utf8");
   // Literal backslash-n / backslash-t (the two-character escape leak), not real newlines/tabs.
-  if (body.includes("\\n") || body.includes("\\t")) {
+  const prose = stripCode(body);
+  if (prose.includes("\\n") || prose.includes("\\t")) {
     issues.push(
       "state-lint: literal \\n or \\t escape sequence found — State must contain real newlines/tabs",
     );
   }
   const lines = body.split("\n");
-  const headings = lines.filter((l) => /^## /.test(l)).length;
-  if (headings < 3) {
+  const missing = REQUIRED_SECTIONS.filter(
+    (name) => !lines.some((l) => new RegExp(`^##\\s+${name}\\b`).test(l)),
+  );
+  if (missing.length > 0) {
     issues.push(
-      `state-lint: only ${headings} '## ' sections (need >= 3: Recent sessions / Unfinished / Decisions) — State may have degraded to a summary`,
+      `state-lint: missing required '## ' section(s): ${missing.join(", ")} — State must keep Recent sessions / Unfinished / Decisions`,
     );
   }
   // Is there a non-blank line before the first '## ' heading (the "**Latest (...)**" summary)?

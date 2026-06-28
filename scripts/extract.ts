@@ -82,6 +82,30 @@ function toolUses(records: Rec[]): Block[] {
 function norm(s: string): string {
   return s.replace(/[ \t\n\r\f\v]+/g, " ").replace(/^ +| +$/g, "");
 }
+
+// Redact common, distinctively-prefixed secrets before any view that reaches Notion. The full chat
+// (chatView -> chat-chunks), prompts (the highlights anchor) and commands are posted ~verbatim with
+// the LLM deliberately OUT of the loop (it cannot "omit" a secret it never re-types), so this
+// deterministic pass is the only thing between a token pasted into a session and a (often team-shared)
+// Notion page. High-confidence patterns only (distinctive prefix/structure, all linear = ReDoS-free)
+// so real prose is never mangled; this reduces but does not guarantee zero leakage — never paste
+// secrets into a session you will save.
+const SECRET = new RegExp(
+  [
+    "sk-[A-Za-z0-9_-]{16,}", // OpenAI / Anthropic-style keys
+    "sk_(?:live|test)_[A-Za-z0-9]{16,}", // Stripe
+    "AKIA[0-9A-Z]{16}", // AWS access key id
+    "gh[posru]_[A-Za-z0-9]{20,}", // GitHub tokens
+    "xox[baprs]-[A-Za-z0-9-]{10,}", // Slack
+    "AIza[0-9A-Za-z_-]{35}", // Google API key
+    "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", // JWT
+    "-----BEGIN[A-Z ]*PRIVATE KEY-----", // private key header
+  ].join("|"),
+  "g",
+);
+function redactSecrets(s: string): string {
+  return s.replace(SECRET, "[REDACTED]");
+}
 // Slice by Unicode codepoint (matching jq's string[0:n]).
 function sliceCp(s: string, n: number): string {
   return [...s].slice(0, n).join("");
@@ -142,14 +166,14 @@ export function commandsView(records: Rec[]): string[] {
     .filter((b) => b.name === "Bash")
     .map((b) => b.input?.command)
     .filter((c): c is string => c != null)
-    .map((c) => c.split("\n")[0] as string);
+    .map((c) => redactSecrets(c.split("\n")[0] as string));
   return [...new Set(cmds)].sort().map((c) => `- \`${c}\``);
 }
 
 export function promptsView(records: Rec[]): string[] {
   return records
     .filter(isRealUser)
-    .map((r) => sliceCp(norm(contentStr(r) as string), 200))
+    .map((r) => redactSecrets(sliceCp(norm(contentStr(r) as string), 200)))
     .filter((t) => t !== "")
     .map((t) => `- ${t}`);
 }
@@ -181,7 +205,7 @@ export function chatView(records: Rec[]): string[] {
       }
     }
     for (const t of turns) {
-      const c0 = norm(t.text);
+      const c0 = redactSecrets(norm(t.text));
       if (c0 === "") continue;
       const c = [...c0].length > 600 ? `${sliceCp(c0, 600)} … (truncated)` : c0;
       out.push(`**${t.role}** ${c}`);
@@ -195,14 +219,16 @@ export function metaView(records: Rec[]) {
   const lastAiTitle = lastWith(records, (r) =>
     r.type === "ai-title" ? r.aiTitle : undefined,
   );
-  const firstUserStr = records.find(
-    (r) => r.type === "user" && typeof r.message?.content === "string",
-  );
+  // Fallback title = the first REAL human prompt (isRealUser), not just the first user-string: the
+  // first string user turn is often a `<command-name>…` wrapper or an isMeta/sidechain turn, which
+  // would otherwise surface verbatim (and unbounded) as the session topic in the SessionStart backlog
+  // reminder and the save-default Name. Same ground-truth anchor promptsView uses; capped like it.
+  const firstReal = records.find(isRealUser);
   return {
     title:
       lastAiTitle ??
-      (firstUserStr
-        ? (firstUserStr.message?.content as string)
+      (firstReal
+        ? sliceCp(norm(contentStr(firstReal) as string), 80)
         : "Untitled session"),
     started: ts[0]?.timestamp ?? null,
     ended: ts[ts.length - 1]?.timestamp ?? null,

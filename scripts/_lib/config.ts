@@ -19,7 +19,7 @@ import {
   renameSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 type Config = Record<string, unknown> & {
@@ -62,7 +62,10 @@ function readConfig(): Config {
 
 function writeConfig(cfg: Config): void {
   const f = configEnsure();
-  const tmp = join(tmpdir(), `iroha-cfg.${process.pid}.${Date.now()}`);
+  // Temp on the SAME filesystem as the destination — a temp in tmpdir() renameSync'd to ~/.iroha
+  // throws EXDEV when /tmp is a separate fs (tmpfs, the Ubuntu/Fedora/Arch default), silently losing
+  // every config write and bricking /iroha:init. dirname(f) is guaranteed same-fs as f.
+  const tmp = join(dirname(f), `.cfg.${process.pid}.${Date.now()}.tmp`);
   writeFileSync(tmp, JSON.stringify(cfg, null, 2));
   renameSync(tmp, f);
 }

@@ -26,6 +26,19 @@ export interface ChatChunks {
   files: string[];
 }
 
+// Neutralize Notion block-tag chars in the verbatim chat before it is posted: a `<page url=…>` that a
+// session echoed or the user pasted would otherwise MOVE that Notion page (a documented MCP footgun),
+// and `<callout>` / `</details>` would corrupt the child page. Only `<`/`>` are escaped (the chars
+// that form tags); inline `code` spans and [text](url) links are protected so intended formatting in
+// the chat still renders. Mirrors compose-session.ts's escapeTags for the body surface.
+const PROTECT = /(`[^`]*`|\[[^\]]*\]\([^)]*\))/;
+function escapeTags(line: string): string {
+  return line
+    .split(PROTECT)
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/[<>]/g, "\\$&")))
+    .join("");
+}
+
 // chatChunks(file, outDir, perChunk) -> write chat-chunk-NN.md files (paragraph Markdown, turn-
 // boundary splits) and return the manifest. An empty chat yields 0 chunks (the caller writes a
 // "(no content)" note instead of a fabricated page).
@@ -34,13 +47,18 @@ export function chatChunks(
   outDir: string,
   perChunk = PER_CHUNK,
 ): ChatChunks {
+  // A non-positive / non-integer perChunk (e.g. IROHA_CHAT_CHUNK=0 or =abc) would otherwise loop
+  // forever (i += 0 never advances → fills the disk) or write one empty chunk with a FABRICATED turn
+  // count (slice(0,NaN)=[] → "Full chat — N turns" page that is empty, the audit-trail fabrication
+  // §5b forbids). Clamp to a sane default so the manifest can never lie.
+  if (!Number.isInteger(perChunk) || perChunk < 1) perChunk = 50;
   const turns = chatView(parseRecords(file));
   mkdirSync(outDir, { recursive: true });
   const files: string[] = [];
   for (let i = 0; i < turns.length; i += perChunk) {
     // Each turn is already a single normalized line ("**You** …" / "**Claude** …"); join with a
     // blank line so every turn renders as its own Notion paragraph.
-    const slice = turns.slice(i, i + perChunk);
+    const slice = turns.slice(i, i + perChunk).map(escapeTags);
     const p = join(
       outDir,
       `chat-chunk-${String(files.length).padStart(2, "0")}.md`,

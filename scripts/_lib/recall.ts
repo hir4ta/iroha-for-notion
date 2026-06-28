@@ -18,7 +18,10 @@ export function recallLocal(
   query: string,
   topn = 3,
 ): SearchHit[] {
-  const minscore = Number(process.env.IROHA_RECALL_MINSCORE ?? "1.2");
+  // A non-numeric IROHA_RECALL_MINSCORE → NaN, and `score < NaN` is always false, which silently
+  // DISABLES the floor (weak partial matches then leak into proactive injection). Guard to the default.
+  const raw = Number(process.env.IROHA_RECALL_MINSCORE ?? "1.2");
+  const minscore = Number.isFinite(raw) ? raw : 1.2;
   return search(root, query, "", topn, minscore);
 }
 

@@ -27,7 +27,6 @@ import {
   renameSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 export interface IndexRecord {
@@ -66,7 +65,11 @@ export function indexRead(root: string): Record<string, unknown>[] {
 function writeLines(root: string, lines: string[]): void {
   const f = indexPath(root);
   mkdirSync(dirname(f), { recursive: true });
-  const tmp = join(tmpdir(), `iroha-idx.${process.pid}.${Date.now()}`);
+  // Temp file MUST live on the same filesystem as the destination, else renameSync throws EXDEV
+  // ("cross-device link not permitted") and the write is silently lost — the default Linux layout
+  // (tmpfs /tmp, repo on another partition) hits exactly that. dirname(f) is the just-created target
+  // dir, so the rename stays same-fs and truly atomic.
+  const tmp = join(dirname(f), `.idx.${process.pid}.${Date.now()}.tmp`);
   writeFileSync(tmp, lines.length ? `${lines.join("\n")}\n` : "");
   renameSync(tmp, f);
 }

@@ -165,6 +165,37 @@ test("backtickTokens wraps bare tokens, leaves code spans and links untouched", 
   );
 });
 
+// ── Notion tag escaping (structure-safe content; no table/callout corruption or markup injection) ──
+test("tag chars < > in prose/cells are escaped; structural tags stay raw; still lint-clean", () => {
+  const intel: Intel = {
+    summary: "比較演算子 a < b と JSX <Foo/> を含む要約",
+    decisions: [
+      {
+        decision: "Generic<T> を導入",
+        why: "型安全",
+        rejected: "any 型で <td>ベタ書き</td>",
+      },
+    ],
+    done: [],
+    unfinished: [],
+    highlights: [],
+  };
+  const body = render(intel, EX);
+  // CONTENT `<`/`>` are escaped, so a literal `<td>`/`</td>`/JSX cannot open a Notion tag
+  expect(body).toContain("Generic\\<T\\>");
+  expect(body).toContain("\\<td\\>");
+  expect(body).not.toContain("any 型で <td>"); // the raw, table-breaking form is gone
+  expect(body).toContain("a \\< b");
+  // STRUCTURAL tags the renderer itself emits are untouched (only content is escaped)
+  expect(body).toContain("<td>Decision</td>");
+  expect(body).toContain('<table header-row="true">');
+  // and the escaped body is still lint-clean by construction
+  const f = join(mktmp(), "esc.md");
+  writeFileSync(f, body);
+  expect(sessionLint(f)).toEqual([]);
+  expect(linkLint(body)).toEqual([]);
+});
+
 // ── CLI end-to-end (self-lint + file write + stdout path) ────────────────────────────────────────
 test("CLI renders to the out file, self-lints clean, prints the path", () => {
   const dir = mktmp();

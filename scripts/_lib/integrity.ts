@@ -98,8 +98,17 @@ export function integrity(root: string): string[] {
         continue;
       }
       if (/^## /.test(line)) inBlock = false;
-      if (inBlock)
+      if (inBlock) {
+        // Page ids appear either dashed (UUID) or bare (32-hex) depending on what the LLM pasted as
+        // the link; match BOTH and normalize to bare. A bare /[0-9a-f]{32}/ alone silently misses a
+        // dashed UUID (max 8-hex run between dashes) — the guard then no-ops instead of catching a
+        // State that points at unsaved work.
+        for (const m of line.matchAll(
+          /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+        ))
+          linked.add(m[0].replace(/-/g, ""));
         for (const m of line.matchAll(/[0-9a-f]{32}/g)) linked.add(m[0]);
+      }
     }
     if (linked.size > 0) {
       const sessions = new Set(

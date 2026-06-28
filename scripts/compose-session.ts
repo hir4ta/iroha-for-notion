@@ -102,13 +102,26 @@ function oneLine(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
-// A table cell: single line, file/path tokens backticked.
-function cell(s: string): string {
-  return backtickTokens(oneLine(s));
+// Escape the tag-forming chars `<` `>` in CONTENT prose, so a literal `<td>` / `<callout>` / `</details>`
+// in a decision, highlight, or quoted chat line cannot open a Notion block tag and silently corrupt the
+// table/callout structure — or, for hostile transcript content, move/delete a page via `<page>` /
+// `<database>`. The enhanced-markdown spec REQUIRES escaping these outside code; this renderer is the
+// LLM-out-of-the-loop chokepoint. Only `<`/`>` are touched (the chars that form tags): `*` `[` `` ` ``
+// stay literal so intended bold / links / inline code in the prose still render. Code spans and links
+// are protected (PROTECT) — inside `code`, `<` is already literal — exactly like backtickTokens.
+function escapeTags(text: string): string {
+  return text
+    .split(PROTECT)
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/[<>]/g, "\\$&")))
+    .join("");
 }
-// A prose line (kept as-is except auto-backticking) for list items / callout text.
+// A table cell: single line, file/path tokens backticked, tag chars escaped (structure-safe).
+function cell(s: string): string {
+  return escapeTags(backtickTokens(oneLine(s)));
+}
+// A prose line for list items / callout text: file tokens backticked, tag chars escaped.
 function prose(s: string): string {
-  return backtickTokens(oneLine(s));
+  return escapeTags(backtickTokens(oneLine(s)));
 }
 
 export function render(intel: Intel, ex: Extract): string {
